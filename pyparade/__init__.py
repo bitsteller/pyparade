@@ -1,22 +1,31 @@
 # coding=utf-8
-import Queue, threading, time
+import Queue, threading, time, sys
 
 import operations
+
+TERMINAL_WIDTH = 80
 
 class Dataset(operations.Source):
 	def __init__(self, source, length=None):
 		self.source = source
-		self._length = None
-		self._buffers = []
-		self._eof = threading.Event()
-
+		self._length = length
 		try:
 			self._length = len(source)
 		except Exception, e:
 			pass
+		if self._length != None:
+			self._length_is_estimated = False
+		else:
+			self._length_is_estimated = True
+
+		self._buffers = []
+		self._eof = threading.Event()
 
 	def __len__(self):
-		return self._length
+		if self._length != None:
+			return self._length
+		else:
+			raise RuntimeError("Length is not available")
 
 	def __str__(self):
 		return "Dataset"
@@ -32,11 +41,22 @@ class Dataset(operations.Source):
 		else:
 			values = self.source
 
+		if self._length_is_estimated:
+			self._length = 0
+
 		for value in values:
 			while len([buf for buf in self._buffers if buf.full()]) > 0:
 				time.sleep(1)
 			[buf.put(value) for buf in self._buffers]
+			if self._length_is_estimated:
+				self._length += 1
 		self._eof.set()
+
+	def has_length(self):
+		return self._length != None
+
+	def length_is_estimated(self):
+		return self._length_is_estimated
 
 	def map(self, function):
 		op = operations.MapOperation(self, function)
@@ -95,23 +115,45 @@ class ParallelProcess(object):
 		ts = threading.Thread(target = self.print_status)
 		ts.start()
 
+	def clear_screen(self):
+		"""Clear screen, return cursor to top left"""
+		sys.stdout.write('\033[2J')
+		sys.stdout.write('\033[H')
+		sys.stdout.flush()
+
 	def print_status(self):
-		print("Status")
 		while not self.dataset.source.finished.is_set():
-			txt = self.title + "\n"
-			txt += "=============================================\n"
-			txt += "\n".join([self.get_buffer_status(op) + "\n" + self.get_operation_status(op) for op in self.chain if isinstance(op, operations.Operation)])
-			print(txt)
-			time.sleep(1)
+			try:
+				self.clear_screen()
+				txt = self.title + "\n"
+				txt += ("=" * TERMINAL_WIDTH) + "\n"
+				txt += "\n".join([self.get_buffer_status(op) + "\n" + self.get_operation_status(op) for op in self.chain if isinstance(op, operations.Operation)])
+				print(txt)
+				time.sleep(1)
+			except Exception, e:
+				print(e)
+				time.sleep(3)
+
 
 	def get_buffer_status(self, op):
 		return "Dataset (buffer: " + str(len(op.inbuffer)) + ")"
 
 	def get_operation_status(self, op):
-		return " " + str(op) + "			" + str(op.processed)
+		status = ""
+		if op.source.has_length():
+			status = str(op.processed) + "/" + str(len(op.source))
+		else:
+			status = str(op.processed)
+			
+
+		space = " "*(TERMINAL_WIDTH - len(str(op)) - len(status) - 1)
+		return " " + str(op) + space + status
 
 	def collect(self):
+		result = []
 		for val in self.buffer.generate():
-			print(val)
+			result.append(val)
+		print(result)
+		return result
 			#time.sleep(1)
 		#return self.buffer.generate()

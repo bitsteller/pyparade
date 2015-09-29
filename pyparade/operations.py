@@ -1,4 +1,4 @@
-import threading, multiprocessing, Queue
+import threading, multiprocessing, Queue, time
 
 class Source(object):
 	def __init__(self):
@@ -15,6 +15,8 @@ class Operation(Source):
 		self.source = source
 		self.inbuffer = source._get_buffer()
 		self.processed = 0
+		self.time_started = None
+		self.time_finished = None
 
 	def __call__(self):
 		self._thread = threading.Thread(target=self.run, name=str(self))
@@ -41,12 +43,15 @@ class MapOperation(Operation):
 	def run(self, chunksize=10):
 		self.running.set()
 		self.enqueued = 0
+		self.time_started = time.time()
 
 		#map
-		#start = time.time()
 		result = []
 		for response in self.pool.imap_unordered(self.map_func, self.inbuffer.generate(), chunksize=chunksize):
 			self.processed += 1
 			self.outbuffer.put(response)
+
+		self.time_finished = time.time()
 		self.finished.set()
 		self.running.clear()
+
