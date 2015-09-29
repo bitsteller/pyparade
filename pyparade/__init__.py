@@ -1,5 +1,5 @@
 # coding=utf-8
-import Queue, threading, time, sys
+import Queue, threading, time, sys, datetime
 
 import operations
 
@@ -50,6 +50,7 @@ class Dataset(operations.Source):
 			[buf.put(value) for buf in self._buffers]
 			if self._length_is_estimated:
 				self._length += 1
+		self._length_is_estimated = False
 		self._eof.set()
 
 	def has_length(self):
@@ -141,7 +142,14 @@ class ParallelProcess(object):
 	def get_operation_status(self, op):
 		status = ""
 		if op.source.has_length():
-			status = str(op.processed) + "/" + str(len(op.source))
+			status = ""
+			if not op.source.length_is_estimated() and len(op.source) > 0 and op.processed > 0:
+				if op.processed == len(op.source):
+					status += "done "
+				else:
+					est = datetime.datetime.now() + datetime.timedelta(seconds = (time.time()-op.time_started)/op.processed*(len(op.source)-op.processed))
+					status += '{0:%}'.format(float(op.processed)/len(op.source)) + "  ETA " + est.strftime("%Y-%m-%d %H:%M") + " "
+			status += str(op.processed) + "/" + str(len(op.source))
 		else:
 			status = str(op.processed)
 			

@@ -14,6 +14,7 @@ class Operation(Source):
 	def __init__(self, source, num_workers=multiprocessing.cpu_count(), initializer = None):
 		self.source = source
 		self.inbuffer = source._get_buffer()
+		self.outbuffer = Queue.Queue(100)
 		self.processed = 0
 		self.time_started = None
 		self.time_finished = None
@@ -33,7 +34,6 @@ class MapOperation(Operation):
 		super(MapOperation, self).__init__(source, num_workers, initializer)
 		self.map_func = map_func
 		self.pool =  multiprocessing.Pool(num_workers, maxtasksperchild = 1000, initializer = initializer)
-		self.outbuffer = Queue.Queue()
 		self.running = threading.Event()
 		self.finished = threading.Event()
 
@@ -47,7 +47,7 @@ class MapOperation(Operation):
 
 		#map
 		result = []
-		for response in self.pool.imap_unordered(self.map_func, self.inbuffer.generate(), chunksize=chunksize):
+		for response in self.pool.imap(self.map_func, self.inbuffer.generate(), chunksize=chunksize):
 			self.processed += 1
 			self.outbuffer.put(response)
 
