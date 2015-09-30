@@ -7,8 +7,11 @@ TERMINAL_WIDTH = 80
 
 class Dataset(operations.Source):
 	def __init__(self, source, length=None):
+		super(Dataset, self).__init__()
+
 		self.source = source
 		self._length = length
+
 		try:
 			self._length = len(source)
 		except Exception, e:
@@ -19,7 +22,7 @@ class Dataset(operations.Source):
 			self._length_is_estimated = True
 
 		self._buffers = []
-		self._eof = threading.Event()
+		self.finished = threading.Event()
 
 	def __len__(self):
 		if self._length != None:
@@ -36,6 +39,7 @@ class Dataset(operations.Source):
 		return buf
 
 	def _fill_buffers(self):
+		self.running.set()
 		if isinstance(self.source, operations.Operation):
 			values = self.source()
 		else:
@@ -45,13 +49,24 @@ class Dataset(operations.Source):
 			self._length = 0
 
 		for value in values:
+			if self._stop_requested.is_set():
+				self.finished.set()
+				self.running.clear()
+				return
+
 			while len([buf for buf in self._buffers if buf.full()]) > 0:
+				if self._stop_requested.is_set():
+					self.finished.set()
+					self.running.clear()
+					return
 				time.sleep(1)
+
 			[buf.put(value) for buf in self._buffers]
 			if self._length_is_estimated:
 				self._length += 1
 		self._length_is_estimated = False
-		self._eof.set()
+		self.finished.set()
+		self.running.clear()
 
 	def has_length(self):
 		return self._length != None
@@ -85,13 +100,12 @@ class Buffer(object):
 			self._length += 1
 
 	def generate(self):
-		while not(self.queue.empty() and self.source._eof.is_set()):
+		while not(self.queue.empty() and self.source.finished.is_set()):
 			try:
 				yield self.queue.get(True, timeout=1)
 				with self._length_lock:
 					self._length -= 1
 			except Exception, e:
-				print("buffer empty")
 				pass
 
 class ParallelProcess(object):
@@ -116,6 +130,9 @@ class ParallelProcess(object):
 		ts = threading.Thread(target = self.print_status)
 		ts.start()
 
+	def stop(self):
+		[s.stop() for s in self.chain]
+
 	def clear_screen(self):
 		"""Clear screen, return cursor to top left"""
 		sys.stdout.write('\033[2J')
@@ -123,12 +140,13 @@ class ParallelProcess(object):
 		sys.stdout.flush()
 
 	def print_status(self):
-		while not self.dataset.source.finished.is_set():
+		while not len([s for s in self.chain if s.finished.is_set()]) == len(self.chain):
 			try:
 				self.clear_screen()
 				txt = self.title + "\n"
 				txt += ("=" * TERMINAL_WIDTH) + "\n"
 				txt += "\n".join([self.get_buffer_status(op) + "\n" + self.get_operation_status(op) for op in self.chain if isinstance(op, operations.Operation)])
+				txt += "\n" + self.get_result_status()
 				print(txt)
 				time.sleep(1)
 			except Exception, e:
@@ -137,29 +155,53 @@ class ParallelProcess(object):
 
 
 	def get_buffer_status(self, op):
-		return "Dataset (buffer: " + str(len(op.inbuffer)) + ")"
+		status = ""
+		if not op.source.running.is_set():
+			status = "stopped"
+
+		title = "Dataset (buffer: " + str(len(op.inbuffer)) + ")"
+		space = " "*(TERMINAL_WIDTH - len(title) - len(status))
+		return title + space + status
 
 	def get_operation_status(self, op):
 		status = ""
-		if op.source.has_length():
-			status = ""
-			if not op.source.length_is_estimated() and len(op.source) > 0 and op.processed > 0:
-				if op.processed == len(op.source):
-					status += "done "
-				else:
-					est = datetime.datetime.now() + datetime.timedelta(seconds = (time.time()-op.time_started)/op.processed*(len(op.source)-op.processed))
-					status += '{0:%}'.format(float(op.processed)/len(op.source)) + "  ETA " + est.strftime("%Y-%m-%d %H:%M") + " "
-			status += str(op.processed) + "/" + str(len(op.source))
+		if not op.running.is_set():
+			status = "stopped"
 		else:
-			status = str(op.processed)
+			if op.source.has_length():
+				if not op.source.length_is_estimated() and len(op.source) > 0 and op.processed > 0:
+					if op.processed == len(op.source):
+						status += "done "
+					else:
+						est = datetime.datetime.now() + datetime.timedelta(seconds = (time.time()-op.time_started)/op.processed*(len(op.source)-op.processed))
+						status += '{0:%}'.format(float(op.processed)/len(op.source)) + "  ETA " + est.strftime("%Y-%m-%d %H:%M") + " "
+				status += str(op.processed) + "/" + str(len(op.source))
+			else:
+				status = str(op.processed)
 			
 
 		space = " "*(TERMINAL_WIDTH - len(str(op)) - len(status) - 1)
 		return " " + str(op) + space + status
 
+	def get_result_status(self):
+		status = ""
+		if self.dataset.has_length():
+			status = str(len(self.dataset))
+
+		title = "Dataset (result)"
+		space = " "*(TERMINAL_WIDTH - len(title) - len(status))
+		return title + space + status		
+
 	def collect(self):
+		#if self.dataset._stop_requested.is_set():
+		#	raise RuntimeError("Process was stopped")
+		#if not self.dataset.finished.is_set():
+		#	raise RuntimeError("Process is not finished")
+
 		result = []
 		for val in self.buffer.generate():
+			if self.dataset._stop_requested.is_set():
+				raise RuntimeError("Process was stopped")
 			result.append(val)
 		print(result)
 		return result
