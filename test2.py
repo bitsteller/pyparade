@@ -23,9 +23,7 @@ def g(a):
 	k,values = a
 	return (k, sum(values)/len(values))
 
-inc = d.map(f)
-inc2 = inc.group_by_key()
-inc3 = inc2.map(g)
-p = pyparade.ParallelProcess(inc3)
+result = d.map(f).group_by_key().map(g)
+p = pyparade.ParallelProcess(result)
 p.run()
 p.collect()
