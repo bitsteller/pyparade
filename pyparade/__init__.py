@@ -133,6 +133,7 @@ class ParallelProcess(object):
 
 		ts = threading.Thread(target = self.print_status)
 		ts.start()
+		ts.join()
 
 	def stop(self):
 		[s.stop() for s in self.chain]
@@ -146,17 +147,21 @@ class ParallelProcess(object):
 	def print_status(self):
 		while not len([s for s in self.chain if s.finished.is_set()]) == len(self.chain):
 			try:
-				self.clear_screen()
-				txt = self.title + "\n"
-				txt += ("=" * TERMINAL_WIDTH) + "\n"
-				txt += "\n".join([self.get_buffer_status(op) + "\n" + self.get_operation_status(op) for op in self.chain if isinstance(op, operations.Operation)])
-				txt += "\n" + self.get_result_status()
-				print(txt)
 				time.sleep(1)
+				self.clear_screen()
+				print(self.get_status())
 			except Exception, e:
 				print(e)
 				time.sleep(3)
+		self.clear_screen()
+		print(self.get_status())
 
+	def get_status(self):
+		txt = self.title + "\n"
+		txt += ("=" * TERMINAL_WIDTH) + "\n"
+		txt += "\n".join([self.get_buffer_status(op) + "\n" + self.get_operation_status(op) for op in self.chain if isinstance(op, operations.Operation)])
+		txt += "\n" + self.get_result_status()
+		return txt
 
 	def get_buffer_status(self, op):
 		status = ""
