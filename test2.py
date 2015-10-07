@@ -16,16 +16,16 @@ d = pyparade.Dataset(range(0,100000))
 
 def f(a):
 	#print(str(a) + "->" + str(a+1))
-	time.sleep(0.001)
-	return a + 1
+	#time.sleep(0.001)
+	return ((a + 1) % 10, a+1)
 
 def g(a):
-	#print(str(a) + "->" + str(a+1))
-	time.sleep(0.1)
-	return a + 1
+	k,values = a
+	return (k, sum(values)/len(values))
 
 inc = d.map(f)
-inc2 = inc.map(g)
-p = pyparade.ParallelProcess(inc2)
+inc2 = inc.group_by_key()
+inc3 = inc2.map(g)
+p = pyparade.ParallelProcess(inc3)
 p.run()
 p.collect()

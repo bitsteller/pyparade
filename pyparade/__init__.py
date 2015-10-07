@@ -78,6 +78,10 @@ class Dataset(operations.Source):
 		op = operations.MapOperation(self, function)
 		return Dataset(op)
 
+	def group_by_key(self, partly = False):
+		op = operations.GroupByKeyOperation(self, partly = partly)
+		return Dataset(op)
+
 class Buffer(object):
 	def __init__(self, source, size = 1000):
 		super(Buffer, self).__init__()

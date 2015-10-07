@@ -1,4 +1,6 @@
-import threading, multiprocessing, Queue, time
+import threading, multiprocessing, Queue, time, collections
+
+from util.btree import BTree
 
 def partition(mapped_values):
 	"""Organize the mapped values by their key.
@@ -43,6 +45,7 @@ class Operation(Source):
 		self.processed = 0
 		self.time_started = None
 		self.time_finished = None
+		self.num_workers = num_workers
 
 	def __call__(self):
 		self._thread = threading.Thread(target=self.run, name=str(self))
@@ -92,10 +95,11 @@ class GroupByKeyOperation(Operation):
 		self.partly = partly
 		self.pool =  multiprocessing.Pool(num_workers, maxtasksperchild = 1000, initializer = initializer)
 
-	def __str__():
+	def __str__(self):
 		return "GroupByKey"
 
-	def run(self, chunksize=10):
+	def run_partly(self, chunksize):
+		#TODO: remove code for non-partly
 		self.running.set()
 		self.enqueued = 0
 		self.time_started = time.time()
@@ -115,26 +119,28 @@ class GroupByKeyOperation(Operation):
 				self.running.clear()
 				return
 
-		if self.processed % (chunksize*self.num_workers) == 0:
-			#partition
-			partitioned_data = []
-			if self.partly:
-				partitioned_data = partition(mapped)
-			else:
-				partitioned_data = partition(result)
+			self.processed += 1
 
-			if self._stop_requested.is_set():
-				self.time_finished = time.time()
-				self.finished.set()
-				self.running.clear()
-				return
+			if self.processed % (chunksize*self.num_workers) == 0:
+				#partition
+				partitioned_data = []
+				if self.partly:
+					partitioned_data = partition(mapped)
+				else:
+					partitioned_data = partition(result)
 
-			if partly:
-				mapped = []
-				for r in reduced:
-					self.outbuffer.put(r)
-			else:
-				result = reduced
+				if self._stop_requested.is_set():
+					self.time_finished = time.time()
+					self.finished.set()
+					self.running.clear()
+					return
+
+				if self.partly:
+					mapped = []
+					for r in partitioned_data:
+						self.outbuffer.put(r)
+				else:
+					result = partitioned_data
 
 		#partition
 		partitioned_data = []
@@ -143,14 +149,42 @@ class GroupByKeyOperation(Operation):
 		else:
 			partitioned_data = partition(result)
 
-		if partly:
+		if self.partly:
 			mapped = []
-			for r in reduced:
+			for r in partitioned_data:
 				self.outbuffer.put(r)
 		else:
-			result = reduced
+			result = partitioned_data
+			for r in result:
+				self.outbuffer.put(r)
 
 		self.time_finished = time.time()
 		self.finished.set()
 		self.running.clear()
 
+	def run(self, chunksize=10):
+		if self.partly:
+			return self.run_partly(chunksize)
+
+		self.running.set()
+		self.enqueued = 0
+		self.time_started = time.time()
+
+		tree = BTree(chunksize, None, None)
+
+		for k, v in self.inbuffer.generate():
+			if k in tree:
+				tree[k].append(v)
+			else:
+				tree[k] = [v]
+			self.processed += 1
+
+		keyleafs = [l for l in tree.get_leafs()]
+		#keys, leafs = zip(*tree.get_leafs())
+		for key, leaf in keyleafs:
+			for k, v in zip(leaf.keys, leaf.values):
+				self.outbuffer.put((k,v))
+
+		self.time_finished = time.time()
+		self.finished.set()
+		self.running.clear()
