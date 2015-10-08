@@ -1,4 +1,4 @@
-import time, signal
+import time, signal, random
 
 import pyparade
 
@@ -17,6 +17,9 @@ d = pyparade.Dataset(range(0,1000000))
 def f(a):
 	#print(str(a) + "->" + str(a+1))
 	#time.sleep(0.001)
+	for i in range(0,1000):
+		random.random()
+
 	return ((a + 1) % 10, a+1)
 
 def g(a):

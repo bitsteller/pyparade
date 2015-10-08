@@ -51,15 +51,11 @@ class Dataset(operations.Source):
 		batch = []
 		last_insert = 0
 		for value in values:
-			if self._stop_requested.is_set():
-				self.finished.set()
-				self.running.clear()
+			if self._check_stop():
 				return
 
 			while len([buf for buf in self._buffers if buf.full()]) > 0:
-				if self._stop_requested.is_set():
-					self.finished.set()
-					self.running.clear()
+				if self._check_stop():
 					return
 				time.sleep(1)
 			batch.append(value)
@@ -147,7 +143,8 @@ class ParallelProcess(object):
 
 		ts = threading.Thread(target = self.print_status)
 		ts.start()
-		ts.join()
+		while ts.is_alive():
+			ts.join(1)
 
 		ended = time.time()
 		print("Computation took " + str(ended-started) + "s.")
@@ -182,7 +179,8 @@ class ParallelProcess(object):
 
 	def get_buffer_status(self, op):
 		status = ""
-		if op.source.finished.is_set():
+
+		if not op.source.length_is_estimated():
 			status += str(len(op.source))
 		elif not op.source.running.is_set():
 			status += "stopped"
@@ -193,6 +191,7 @@ class ParallelProcess(object):
 
 	def get_operation_status(self, op):
 		status = ""
+
 		if op.source.has_length():
 			if not op.source.length_is_estimated() and len(op.source) > 0 and op.processed > 0:
 				if op.processed == len(op.source):
@@ -207,7 +206,7 @@ class ParallelProcess(object):
 				status += str(op.processed) + "/" + str(len(op.source))
 		else:
 			if not op.running.is_set():
-				status += "stopped"			
+				status += "stopped"	
 
 		space = " "*(TERMINAL_WIDTH - len(str(op)) - len(status) - 1)
 		return " " + str(op) + space + status

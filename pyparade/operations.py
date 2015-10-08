@@ -32,6 +32,15 @@ class Source(object):
 			parents.extend(self.source.get_parents())
 		return parents
 
+	def _check_stop(self):
+		if self._stop_requested.is_set():
+			self.finished.set()
+			self.running.clear()
+			return True
+		else:
+			#print(str(self.id) + "no stop")
+			return False
+
 	def stop(self):
 		if self.running.is_set():
 			self._stop_requested.set()
@@ -50,6 +59,9 @@ class Operation(Source):
 		self.num_workers = num_workers
 
 	def __call__(self):
+		self.running.set()
+		self.time_started = time.time()
+
 		self._thread = threading.Thread(target=self.run, name=str(self))
 		self._thread.start()
 		while not self._stop_requested.is_set() and not (self._outbuffer.empty() and self.finished.is_set()):
@@ -60,16 +72,18 @@ class Operation(Source):
 			except Exception, e:
 				pass
 
-		if self._stop_requested.is_set():
-			self.time_finished = time.time()
-			self.finished.set()
-			self.running.clear()
+		if self._check_stop():
+			return
 
 		self._thread.join()
 		self._flush_output()
 		batch = self._outbuffer.get(True, timeout=1)
 		for value in batch:
 			yield value
+
+		self.time_finished = time.time()
+		self.finished.set()
+		self.running.clear()
 
 	def _output(self, value):
 		self._outbatch.append(value)
@@ -81,6 +95,12 @@ class Operation(Source):
 		self._outbatch = []
 		self._last_output = time.time()
 
+	def _check_stop(self):
+		if self._stop_requested.is_set():
+			self.time_finished = time.time()
+		return super(Operation, self)._check_stop()
+
+
 class MapOperation(Operation):
 	def __init__(self, source, map_func, num_workers=multiprocessing.cpu_count(), initializer = None):
 		super(MapOperation, self).__init__(source, num_workers, initializer)
@@ -91,23 +111,15 @@ class MapOperation(Operation):
 		return "Map"
 
 	def run(self, chunksize=10):
-		self.running.set()
-		self.enqueued = 0
-		self.time_started = time.time()
-
 		#map
 		result = []
 		for response in self.pool.imap(self.map_func, self.inbuffer.generate(), chunksize=chunksize):
-			if not self._stop_requested.is_set():
-				self.processed += 1
-				self._output(response)
-			else:
+			if self._check_stop():
 				self.pool.terminate()
-				break
+				return
 
-		self.time_finished = time.time()
-		self.finished.set()
-		self.running.clear()
+			self.processed += 1
+			self._output(response)
 
 class GroupByKeyOperation(Operation):
 	"""docstring for GroupByKeyOperation"""
@@ -120,11 +132,6 @@ class GroupByKeyOperation(Operation):
 		return "GroupByKey"
 
 	def run_partly(self, chunksize):
-		#TODO: remove code for non-partly
-		self.running.set()
-		self.enqueued = 0
-		self.time_started = time.time()
-
 		#group
 		result = []
 		mapped = []
@@ -134,10 +141,7 @@ class GroupByKeyOperation(Operation):
 			else:
 				result.append(v)
 
-			if self._stop_requested.is_set():
-				self.time_finished = time.time()
-				self.finished.set()
-				self.running.clear()
+			if self._check_stop():
 				return
 
 			self.processed += 1
@@ -150,10 +154,7 @@ class GroupByKeyOperation(Operation):
 				else:
 					partitioned_data = partition(result)
 
-				if self._stop_requested.is_set():
-					self.time_finished = time.time()
-					self.finished.set()
-					self.running.clear()
+				if self._check_stop():
 					return
 
 				if self.partly:
@@ -179,21 +180,16 @@ class GroupByKeyOperation(Operation):
 			for r in result:
 				self._output(r)
 
-		self.time_finished = time.time()
-		self.finished.set()
-		self.running.clear()
-
 	def run(self, chunksize=10):
 		if self.partly:
 			return self.run_partly(chunksize)
 
-		self.running.set()
-		self.enqueued = 0
-		self.time_started = time.time()
-
 		tree = BTree(chunksize, None, None)
 
 		for k, v in self.inbuffer.generate():
+			if self._check_stop():
+				return
+
 			if k in tree:
 				tree[k].append(v)
 			else:
@@ -205,7 +201,3 @@ class GroupByKeyOperation(Operation):
 		for key, leaf in keyleafs:
 			for k, v in zip(leaf.keys, leaf.values):
 				self._output((k,v))
-
-		self.time_finished = time.time()
-		self.finished.set()
-		self.running.clear()
