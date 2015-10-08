@@ -2,23 +2,6 @@ import threading, multiprocessing, Queue, time, collections
 
 from util.btree import BTree
 
-def partition(mapped_values):
-	"""Organize the mapped values by their key.
-	Returns an unsorted sequence of tuples with a key and a sequence of values.
-
-	Args: 
-		mapped_values: a list of tuples containing key, value pairs
-
-	Returns:
-		A list of tuples (key, [list of values])
-	"""
-
-	partitioned_data = collections.defaultdict(list)
-	for key, value in mapped_values:
-		partitioned_data[key].append(value)
-	return partitioned_data.items()
-
-
 class Source(object):
 	def __init__(self):
 		super(Source, self).__init__()
@@ -135,55 +118,31 @@ class GroupByKeyOperation(Operation):
 		return "GroupByKey"
 
 	def run_partly(self, chunksize):
-		#group
-		result = []
-		mapped = []
-		for v in self.inbuffer.generate():
-			if self.partly:
-				mapped.append(v)
-			else:
-				result.append(v)
+		tree = BTree(chunksize, None, None)
 
+		for k, v in self.inbuffer.generate():
 			if self._check_stop():
 				return
 
+			if k in tree:
+				tree[k].append(v)
+			else:
+				tree[k] = [v]
 			self.processed += 1
 
 			if self.processed % (chunksize*self.num_workers) == 0:
-				#partition
-				partitioned_data = []
-				if self.partly:
-					partitioned_data = partition(mapped)
-				else:
-					partitioned_data = partition(result)
+				keyleafs = [l for l in tree.get_leafs()]
+				for key, leaf in keyleafs:
+					for k, v in zip(leaf.keys, leaf.values):
+						self._output((k,v))
+				tree = BTree(chunksize, None, None)
 
-				if self._check_stop():
-					return
+		keyleafs = [l for l in tree.get_leafs()]
+		for key, leaf in keyleafs:
+			for k, v in zip(leaf.keys, leaf.values):
+				self._output((k,v))
 
-				if self.partly:
-					mapped = []
-					for r in partitioned_data:
-						self._output(r)
-				else:
-					result = partitioned_data
-
-		#partition
-		partitioned_data = []
-		if self.partly:
-			partitioned_data = partition(mapped)
-		else:
-			partitioned_data = partition(result)
-
-		if self.partly:
-			mapped = []
-			for r in partitioned_data:
-				self._output(r)
-		else:
-			result = partitioned_data
-			for r in result:
-				self._output(r)
-
-	def run(self, chunksize=10):
+	def run(self, chunksize=100):
 		if self.partly:
 			return self.run_partly(chunksize)
 
