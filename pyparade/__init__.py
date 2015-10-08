@@ -67,7 +67,7 @@ class Dataset(operations.Source):
 			if self._length_is_estimated:
 				self._length += 1
 
-			if time.time() - last_insert > 5:
+			if time.time() - last_insert > 1:
 				[buf.put(batch) for buf in self._buffers]
 				batch = []
 				last_insert = time.time()
@@ -182,8 +182,10 @@ class ParallelProcess(object):
 
 	def get_buffer_status(self, op):
 		status = ""
-		if not op.source.running.is_set():
-			status = "stopped"
+		if op.source.finished.is_set():
+			status += str(len(op.source))
+		elif not op.source.running.is_set():
+			status += "stopped"
 
 		title = "Dataset (buffer: " + str(len(op.inbuffer)) + ")"
 		space = " "*(TERMINAL_WIDTH - len(title) - len(status))
@@ -191,20 +193,21 @@ class ParallelProcess(object):
 
 	def get_operation_status(self, op):
 		status = ""
-		if not op.running.is_set():
-			status = "stopped"
-		else:
-			if op.source.has_length():
-				if not op.source.length_is_estimated() and len(op.source) > 0 and op.processed > 0:
-					if op.processed == len(op.source):
-						status += "done "
-					else:
-						est = datetime.datetime.now() + datetime.timedelta(seconds = (time.time()-op.time_started)/op.processed*(len(op.source)-op.processed))
-						status += '{0:%}'.format(float(op.processed)/len(op.source)) + "  ETA " + est.strftime("%Y-%m-%d %H:%M") + " "
-				status += str(op.processed) + "/" + str(len(op.source))
+		if op.source.has_length():
+			if not op.source.length_is_estimated() and len(op.source) > 0 and op.processed > 0:
+				if op.processed == len(op.source):
+					status += "done"
+				elif op.running.is_set():
+					est = datetime.datetime.now() + datetime.timedelta(seconds = (time.time()-op.time_started)/op.processed*(len(op.source)-op.processed))
+					status += '{0:%}'.format(float(op.processed)/len(op.source)) + "  ETA " + est.strftime("%Y-%m-%d %H:%M") + " "
+					status += str(op.processed) + "/" + str(len(op.source))
+				else:
+					status += "stopped"
 			else:
-				status = str(op.processed)
-			
+				status += str(op.processed) + "/" + str(len(op.source))
+		else:
+			if not op.running.is_set():
+				status += "stopped"			
 
 		space = " "*(TERMINAL_WIDTH - len(str(op)) - len(status) - 1)
 		return " " + str(op) + space + status

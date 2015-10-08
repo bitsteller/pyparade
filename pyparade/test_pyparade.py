@@ -12,4 +12,3 @@ class TestPyParade(unittest.TestCase):
 		p = ParallelProcess(counts, name="Counting words")
 		p.run()
 		print(p.collect())
-

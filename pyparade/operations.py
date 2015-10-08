@@ -73,7 +73,7 @@ class Operation(Source):
 
 	def _output(self, value):
 		self._outbatch.append(value)
-		if time.time() - self._last_output > 5:
+		if time.time() - self._last_output > 1:
 			self._flush_output()
 
 	def _flush_output(self):
