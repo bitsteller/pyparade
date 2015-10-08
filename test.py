@@ -12,7 +12,7 @@ def signal_handler(signal, frame):
 if __name__ == '__main__':
 	signal.signal(signal.SIGINT, signal_handler) #abort on CTRL-C
 
-d = pyparade.Dataset(range(0,100000))
+d = pyparade.Dataset(range(0,10000))
 
 def f(a):
 	#print(str(a) + "->" + str(a+1))
@@ -21,7 +21,7 @@ def f(a):
 
 def g(a):
 	#print(str(a) + "->" + str(a+1))
-	time.sleep(0.1)
+	time.sleep(0.01)
 	return a + 1
 
 inc = d.map(f)

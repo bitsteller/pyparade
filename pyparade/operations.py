@@ -41,7 +41,9 @@ class Operation(Source):
 		super(Operation, self).__init__()
 		self.source = source
 		self.inbuffer = source._get_buffer()
-		self.outbuffer = Queue.Queue(100)
+		self._outbuffer = Queue.Queue(100)
+		self._last_output = time.time()
+		self._outbatch = []
 		self.processed = 0
 		self.time_started = None
 		self.time_finished = None
@@ -50,15 +52,34 @@ class Operation(Source):
 	def __call__(self):
 		self._thread = threading.Thread(target=self.run, name=str(self))
 		self._thread.start()
-		while not self._stop_requested.is_set() and not (self.outbuffer.empty() and self.finished.is_set()):
+		while not self._stop_requested.is_set() and not (self._outbuffer.empty() and self.finished.is_set()):
 			try:
-				yield self.outbuffer.get(True, timeout=1)
+				batch = self._outbuffer.get(True, timeout=1)
+				for value in batch:
+					yield value 
 			except Exception, e:
 				pass
+
 		if self._stop_requested.is_set():
 			self.time_finished = time.time()
 			self.finished.set()
 			self.running.clear()
+
+		self._thread.join()
+		self._flush_output()
+		batch = self._outbuffer.get(True, timeout=1)
+		for value in batch:
+			yield value
+
+	def _output(self, value):
+		self._outbatch.append(value)
+		if time.time() - self._last_output > 5:
+			self._flush_output()
+
+	def _flush_output(self):
+		self._outbuffer.put(self._outbatch)
+		self._outbatch = []
+		self._last_output = time.time()
 
 class MapOperation(Operation):
 	def __init__(self, source, map_func, num_workers=multiprocessing.cpu_count(), initializer = None):
@@ -79,7 +100,7 @@ class MapOperation(Operation):
 		for response in self.pool.imap(self.map_func, self.inbuffer.generate(), chunksize=chunksize):
 			if not self._stop_requested.is_set():
 				self.processed += 1
-				self.outbuffer.put(response)
+				self._output(response)
 			else:
 				self.pool.terminate()
 				break
@@ -138,7 +159,7 @@ class GroupByKeyOperation(Operation):
 				if self.partly:
 					mapped = []
 					for r in partitioned_data:
-						self.outbuffer.put(r)
+						self._output(r)
 				else:
 					result = partitioned_data
 
@@ -152,11 +173,11 @@ class GroupByKeyOperation(Operation):
 		if self.partly:
 			mapped = []
 			for r in partitioned_data:
-				self.outbuffer.put(r)
+				self._output(r)
 		else:
 			result = partitioned_data
 			for r in result:
-				self.outbuffer.put(r)
+				self._output(r)
 
 		self.time_finished = time.time()
 		self.finished.set()
@@ -183,7 +204,7 @@ class GroupByKeyOperation(Operation):
 		#keys, leafs = zip(*tree.get_leafs())
 		for key, leaf in keyleafs:
 			for k, v in zip(leaf.keys, leaf.values):
-				self.outbuffer.put((k,v))
+				self._output((k,v))
 
 		self.time_finished = time.time()
 		self.finished.set()

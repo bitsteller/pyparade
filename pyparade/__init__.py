@@ -48,6 +48,8 @@ class Dataset(operations.Source):
 		if self._length_is_estimated:
 			self._length = 0
 
+		batch = []
+		last_insert = 0
 		for value in values:
 			if self._stop_requested.is_set():
 				self.finished.set()
@@ -60,10 +62,18 @@ class Dataset(operations.Source):
 					self.running.clear()
 					return
 				time.sleep(1)
+			batch.append(value)
 
-			[buf.put(value) for buf in self._buffers]
 			if self._length_is_estimated:
 				self._length += 1
+
+			if time.time() - last_insert > 5:
+				[buf.put(batch) for buf in self._buffers]
+				batch = []
+				last_insert = time.time()
+
+		[buf.put(batch) for buf in self._buffers]
+
 		self._length_is_estimated = False
 		self.finished.set()
 		self.running.clear()
@@ -98,17 +108,20 @@ class Buffer(object):
 	def full(self):
 		return self.queue.full()
 
-	def put(self, obj):
-		self.queue.put(obj, True)
+	def put(self, values):
+		self.queue.put(values, True)
 		with self._length_lock:
-			self._length += 1
+			self._length += len(values)
 
 	def generate(self):
 		while not(self.queue.empty() and self.source.finished.is_set()):
 			try:
-				yield self.queue.get(True, timeout=1)
-				with self._length_lock:
-					self._length -= 1
+				values = self.queue.get(True, timeout=1)
+				for value in values:
+					yield value
+					with self._length_lock:
+						self._length -= 1
+					
 			except Exception, e:
 				pass
 
@@ -125,6 +138,7 @@ class ParallelProcess(object):
 		chain.reverse()
 		self.chain = chain
 
+		started = time.time()
 		threads = []
 		for dataset in [block for block in chain if isinstance(block,Dataset)]:
 			t = threading.Thread(target = dataset._fill_buffers, name="Buffer")
@@ -134,6 +148,9 @@ class ParallelProcess(object):
 		ts = threading.Thread(target = self.print_status)
 		ts.start()
 		ts.join()
+
+		ended = time.time()
+		print("Computation took " + str(ended-started) + "s.")
 
 	def stop(self):
 		[s.stop() for s in self.chain]
