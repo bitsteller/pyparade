@@ -33,7 +33,7 @@ class Dataset(operations.Source):
 	def __str__(self):
 		return "Dataset"
 
-	def _get_buffer(self, size = 60):
+	def _get_buffer(self, size = 30):
 		buf = Buffer(self, size=size)
 		self._buffers.append(buf)
 		return buf
@@ -67,6 +67,11 @@ class Dataset(operations.Source):
 				[buf.put(batch) for buf in self._buffers]
 				batch = []
 				last_insert = time.time()
+
+		while len([buf for buf in self._buffers if buf.full()]) > 0:
+			if self._check_stop():
+				return
+			time.sleep(1)
 
 		[buf.put(batch) for buf in self._buffers]
 

@@ -51,21 +51,23 @@ class Operation(Source):
 			if self._check_stop():
 				return
 			try:
-				batch = self._outbuffer.get(True)
+				batch = self._outbuffer.get(True, timeout=1)
 				for value in batch:
 					yield value 
 			except Exception, e:
 				pass
 
-		while self._thread.is_alive():
+		self._flush_output()
+
+		while not self._outbuffer.empty():
 			if self._check_stop():
 				return
-			self._thread.join(1)
-
-		self._flush_output()
-		batch = self._outbuffer.get(True)
-		for value in batch:
-			yield value
+			try:
+				batch = self._outbuffer.get(True, timeout=1)
+				for value in batch:
+					yield value 
+			except Exception, e:
+				pass
 
 		self.time_finished = time.time()
 		self.finished.set()
@@ -93,6 +95,8 @@ class Operation(Source):
 	def _generate_input(self):
 		for value in self.inbuffer.generate():
 			while self._outbuffer.full():
+				if self._check_stop():
+					raise BufferExit("stop requested")
 				time.sleep(1)
 			yield value
 
