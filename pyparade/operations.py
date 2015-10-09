@@ -134,7 +134,7 @@ class GroupByKeyOperation(Operation):
 	def run_partly(self, chunksize):
 		tree = BTree(chunksize, None, None)
 
-		for k, v in self.inbuffer._generate_input():
+		for k, v in self._generate_input():
 			if self._check_stop():
 				return
 
@@ -162,7 +162,7 @@ class GroupByKeyOperation(Operation):
 
 		tree = BTree(chunksize, None, None)
 
-		for k, v in self.inbuffer._generate_input():
+		for k, v in self._generate_input():
 			if self._check_stop():
 				return
 
