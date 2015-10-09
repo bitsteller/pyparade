@@ -26,7 +26,7 @@ def g(a):
 	k,values = a
 	return (k, sum(values)/len(values))
 
-result = d.map(f).group_by_key(partly = True).map(g)
+result = d.map(f).group_by_key().map(g)
 p = pyparade.ParallelProcess(result)
 p.run()
 p.collect()

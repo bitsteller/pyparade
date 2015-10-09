@@ -33,7 +33,7 @@ class Operation(Source):
 		super(Operation, self).__init__()
 		self.source = source
 		self.inbuffer = source._get_buffer()
-		self._outbuffer = Queue.Queue(100)
+		self._outbuffer = Queue.Queue(10)
 		self._last_output = time.time()
 		self._outbatch = []
 		self.processed = 0
@@ -47,11 +47,11 @@ class Operation(Source):
 
 		self._thread = threading.Thread(target=self.run, name=str(self))
 		self._thread.start()
-		while not (self._outbuffer.empty() and not self._thread.is_alive()):
+		while self._thread.is_alive():
 			if self._check_stop():
 				return
 			try:
-				batch = self._outbuffer.get(True, timeout=1)
+				batch = self._outbuffer.get(True)
 				for value in batch:
 					yield value 
 			except Exception, e:
@@ -77,6 +77,10 @@ class Operation(Source):
 			self._flush_output()
 
 	def _flush_output(self):
+		while self._outbuffer.full():
+			if self._check_stop():
+				return
+			time.sleep(1)
 		self._outbuffer.put(self._outbatch)
 		self._outbatch = []
 		self._last_output = time.time()
@@ -85,6 +89,12 @@ class Operation(Source):
 		if self._stop_requested.is_set():
 			self.time_finished = time.time()
 		return super(Operation, self)._check_stop()
+
+	def _generate_input(self):
+		for value in self.inbuffer.generate():
+			while self._outbuffer.full():
+				time.sleep(1)
+			yield value
 
 
 class MapOperation(Operation):
@@ -99,7 +109,7 @@ class MapOperation(Operation):
 	def run(self, chunksize=10):
 		#map
 		result = []
-		for response in self.pool.imap(self.map_func, self.inbuffer.generate(), chunksize=chunksize):
+		for response in self.pool.imap(self.map_func, self._generate_input(), chunksize=chunksize):
 			if self._check_stop():
 				self.pool.terminate()
 				return
@@ -120,7 +130,7 @@ class GroupByKeyOperation(Operation):
 	def run_partly(self, chunksize):
 		tree = BTree(chunksize, None, None)
 
-		for k, v in self.inbuffer.generate():
+		for k, v in self.inbuffer._generate_input():
 			if self._check_stop():
 				return
 
@@ -148,7 +158,7 @@ class GroupByKeyOperation(Operation):
 
 		tree = BTree(chunksize, None, None)
 
-		for k, v in self.inbuffer.generate():
+		for k, v in self.inbuffer._generate_input():
 			if self._check_stop():
 				return
 

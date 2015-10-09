@@ -33,8 +33,8 @@ class Dataset(operations.Source):
 	def __str__(self):
 		return "Dataset"
 
-	def _get_buffer(self):
-		buf = Buffer(self)
+	def _get_buffer(self, size = 60):
+		buf = Buffer(self, size=size)
 		self._buffers.append(buf)
 		return buf
 
@@ -89,7 +89,7 @@ class Dataset(operations.Source):
 		return Dataset(op)
 
 class Buffer(object):
-	def __init__(self, source, size = 1000):
+	def __init__(self, source, size):
 		super(Buffer, self).__init__()
 		self.source = source
 		self.size = size
@@ -125,7 +125,7 @@ class ParallelProcess(object):
 	def __init__(self, dataset, title="Parallel process"):
 		self.dataset = dataset
 		self.result = []
-		self.buffer = self.dataset._get_buffer()
+		self.buffer = self.dataset._get_buffer(size=None)
 		self.title = title
 
 	def run(self):
