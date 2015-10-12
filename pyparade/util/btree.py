@@ -1,7 +1,7 @@
 import os, json, hashlib
 from abc import ABCMeta, abstractmethod
 
-from witica.util import sstr, Event
+from pyparade.util import sstr, Event
 
 #--------------------
 #B+ Tree implemention
