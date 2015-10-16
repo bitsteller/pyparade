@@ -85,12 +85,16 @@ class Dataset(operations.Source):
 	def length_is_estimated(self):
 		return self._length_is_estimated
 
-	def map(self, function):
-		op = operations.MapOperation(self, function)
+	def map(self, map_func):
+		op = operations.MapOperation(self, map_func)
 		return Dataset(op)
 
 	def group_by_key(self, partly = False):
 		op = operations.GroupByKeyOperation(self, partly = partly)
+		return Dataset(op)
+
+	def fold(self, zero_value, fold_func):
+		op = operations.FoldOperation(self, zero_value, fold_func)
 		return Dataset(op)
 
 class Buffer(object):
@@ -164,14 +168,16 @@ class ParallelProcess(object):
 		sys.stdout.flush()
 
 	def print_status(self):
+		self.clear_screen()
+		print(self.get_status())
 		while not len([s for s in self.chain if s.finished.is_set()]) == len(self.chain):
 			try:
-				time.sleep(1)
+				time.sleep(3)
 				self.clear_screen()
 				print(self.get_status())
 			except Exception, e:
 				print(e)
-				time.sleep(3)
+				time.sleep(5)
 		self.clear_screen()
 		print(self.get_status())
 

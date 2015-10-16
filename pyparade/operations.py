@@ -1,5 +1,7 @@
 import threading, multiprocessing, Queue, time, collections
 
+from concurrent import futures
+
 from util.btree import BTree
 
 class Source(object):
@@ -96,7 +98,7 @@ class Operation(Source):
 		for value in self.inbuffer.generate():
 			while self._outbuffer.full():
 				if self._check_stop():
-					raise BufferExit("stop requested")
+					raise BufferError("stop requested")
 				time.sleep(1)
 			yield value
 
@@ -126,7 +128,7 @@ class GroupByKeyOperation(Operation):
 	def __init__(self, source, partly = False, num_workers=multiprocessing.cpu_count(), initializer = None):
 		super(GroupByKeyOperation, self).__init__(source, num_workers, initializer)
 		self.partly = partly
-		self.pool =  multiprocessing.Pool(num_workers, maxtasksperchild = 1000, initializer = initializer)
+		#self.pool =  multiprocessing.Pool(num_workers, maxtasksperchild = 1000, initializer = initializer)
 
 	def __str__(self):
 		return "GroupByKey"
@@ -177,3 +179,51 @@ class GroupByKeyOperation(Operation):
 		for key, leaf in keyleafs:
 			for k, v in zip(leaf.keys, leaf.values):
 				self._output((k,v))
+
+
+class FoldOperation(Operation):
+	"""Folds the dataset using a combine function"""
+	def __init__(self, source, zero_value, fold_func, num_workers=multiprocessing.cpu_count(), initializer = None):
+		super(FoldOperation, self).__init__(source, num_workers, initializer)
+		self.pool =  futures.ThreadPoolExecutor(num_workers)
+		self.zero_value = zero_value
+		self.fold_func = fold_func
+
+	def __str__(self):
+		return "Fold"
+
+	def _generate_input_batches(self, chunksize):
+		batch = []
+		for value in self._generate_input():
+			batch.append(value)
+
+			if len(batch) == chunksize:
+				yield batch
+				batch = []
+		yield batch
+
+	def _fold_batch(self, batch):
+		result = self.zero_value
+		for value in batch:
+			result = self.fold_func(result, value)
+		return result
+
+	def run(self, chunksize = 100):
+		result = []
+
+		for response in self.pool.map(self._fold_batch, self._generate_input_batches(chunksize = chunksize)):
+			if self._check_stop():
+				self.pool.shutdown()
+				return
+
+			result.append(response)
+
+			if len(result) == chunksize:
+				result = [self._fold_batch(result)]
+
+			self.processed += 1
+		
+		self._output(self._fold_batch(result))
+		
+		self.pool.shutdown()
+
