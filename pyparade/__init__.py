@@ -1,5 +1,5 @@
 # coding=utf-8
-import Queue, threading, time, sys, datetime
+import Queue, threading, time, sys, datetime, multiprocessing
 
 import operations
 
@@ -137,11 +137,15 @@ class ParallelProcess(object):
 		self.buffer = self.dataset._get_buffer(size=None)
 		self.title = title
 
-	def run(self):
+	def run(self, num_workers = multiprocessing.cpu_count()):
 		#Build process tree
 		chain = self.dataset.get_parents()
 		chain.reverse()
 		self.chain = chain
+
+		#set number of workers
+		for operation in [block for block in chain if isinstance(block,operations.Operation)]:
+			operation.num_workers = num_workers
 
 		started = time.time()
 		threads = []
