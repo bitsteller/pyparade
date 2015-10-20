@@ -2,7 +2,8 @@ import threading, multiprocessing, Queue, time, collections
 
 from concurrent import futures
 
-from util.btree import BTree
+from pyparade.util import ParMap
+from pyparade.util.btree import BTree
 
 class Source(object):
 	def __init__(self):
@@ -107,17 +108,18 @@ class MapOperation(Operation):
 	def __init__(self, source, map_func, num_workers=multiprocessing.cpu_count(), initializer = None):
 		super(MapOperation, self).__init__(source, num_workers, initializer)
 		self.map_func = map_func
-		self.pool =  multiprocessing.Pool(num_workers, maxtasksperchild = 1000, initializer = initializer)
+		self.pool = None #multiprocessing.Pool(num_workers, maxtasksperchild = 1000, initializer = initializer)
 
 	def __str__(self):
 		return "Map"
 
 	def run(self, chunksize=10):
+		self.pool = ParMap(self.map_func, self.num_workers)
 		#map
 		result = []
-		for response in self.pool.imap(self.map_func, self._generate_input(), chunksize=chunksize):
+		for response in self.pool.map(self._generate_input()):
 			if self._check_stop():
-				self.pool.terminate()
+				self.pool.stop()
 				return
 
 			self.processed += 1
@@ -128,7 +130,6 @@ class GroupByKeyOperation(Operation):
 	def __init__(self, source, partly = False, num_workers=multiprocessing.cpu_count(), initializer = None):
 		super(GroupByKeyOperation, self).__init__(source, num_workers, initializer)
 		self.partly = partly
-		#self.pool =  multiprocessing.Pool(num_workers, maxtasksperchild = 1000, initializer = initializer)
 
 	def __str__(self):
 		return "GroupByKey"
@@ -185,7 +186,7 @@ class FoldOperation(Operation):
 	"""Folds the dataset using a combine function"""
 	def __init__(self, source, zero_value, fold_func, num_workers=multiprocessing.cpu_count(), initializer = None):
 		super(FoldOperation, self).__init__(source, num_workers, initializer)
-		self.pool =  futures.ThreadPoolExecutor(num_workers)
+		self.pool = None #ParMap(self._fold_batch, num_workers = num_workers) #futures.ThreadPoolExecutor(num_workers)
 		self.zero_value = zero_value
 		self.fold_func = fold_func
 
@@ -209,11 +210,12 @@ class FoldOperation(Operation):
 		return result
 
 	def run(self, chunksize = 100):
+		self.pool = ParMap(self._fold_batch, num_workers = self.num_workers)
 		result = []
 
 		for response in self.pool.map(self._fold_batch, self._generate_input_batches(chunksize = chunksize)):
 			if self._check_stop():
-				self.pool.shutdown()
+				self.pool.stop()
 				return
 
 			result.append(response)
@@ -224,6 +226,4 @@ class FoldOperation(Operation):
 			self.processed += 1
 		
 		self._output(self._fold_batch(result))
-		
-		self.pool.shutdown()
 
