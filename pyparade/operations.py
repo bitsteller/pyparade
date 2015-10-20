@@ -144,8 +144,8 @@ class FlatMapOperation(MapOperation):
 
 			self.processed += 1
 			#flatten result
-			for r in respones: 
-				self._output(response)
+			for r in response: 
+				self._output(r)
 		
 class GroupByKeyOperation(Operation):
 	"""docstring for GroupByKeyOperation"""
