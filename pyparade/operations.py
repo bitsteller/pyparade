@@ -235,7 +235,7 @@ class FoldOperation(Operation):
 		self.pool = ParMap(self._fold_batch, num_workers = self.num_workers)
 		result = []
 
-		for response in self.pool.map(self._fold_batch, self._generate_input_batches(chunksize = chunksize)):
+		for response in self.pool.map(self._generate_input_batches(chunksize = chunksize)):
 			if self._check_stop():
 				self.pool.stop()
 				return
