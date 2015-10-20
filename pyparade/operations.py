@@ -113,7 +113,7 @@ class MapOperation(Operation):
 	def __str__(self):
 		return "Map"
 
-	def run(self, chunksize=10):
+	def run(self):
 		self.pool = ParMap(self.map_func, self.num_workers)
 		#map
 		result = []
@@ -125,6 +125,28 @@ class MapOperation(Operation):
 			self.processed += 1
 			self._output(response)
 
+class FlatMapOperation(MapOperation):
+	"""Calls the map function for every value in the dataset and then flattens the result"""
+	def __init__(self, source, map_func, num_workers=multiprocessing.cpu_count(), initializer = None):
+		super(FlatMapOperation, self).__init__(source, map_func, num_workers, initializer)
+
+	def __str__(self):
+		return "FlatMap"
+
+	def run(self):
+		self.pool = ParMap(self.map_func, self.num_workers)
+		#map
+		result = []
+		for response in self.pool.map(self._generate_input()):
+			if self._check_stop():
+				self.pool.stop()
+				return
+
+			self.processed += 1
+			#flatten result
+			for r in respones: 
+				self._output(response)
+		
 class GroupByKeyOperation(Operation):
 	"""docstring for GroupByKeyOperation"""
 	def __init__(self, source, partly = False, num_workers=multiprocessing.cpu_count(), initializer = None):

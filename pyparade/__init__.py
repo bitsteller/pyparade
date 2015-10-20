@@ -89,6 +89,10 @@ class Dataset(operations.Source):
 		op = operations.MapOperation(self, map_func)
 		return Dataset(op)
 
+	def flat_map(self, map_func):
+		op = operations.FlatMapOperation(self, map_func)
+		return Dataset(op)
+
 	def group_by_key(self, partly = False):
 		op = operations.GroupByKeyOperation(self, partly = partly)
 		return Dataset(op)
