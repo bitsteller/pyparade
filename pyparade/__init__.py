@@ -178,11 +178,15 @@ class ParallelProcess(object):
 	def print_status(self):
 		self.clear_screen()
 		print(self.get_status())
+		t = 0
 		while not len([s for s in self.chain if s.finished.is_set()]) == len(self.chain):
 			try:
-				time.sleep(10)
-				self.clear_screen()
-				print(self.get_status())
+				time.sleep(1)
+				t += 1
+				if t >= 10:
+					self.clear_screen()
+					print(self.get_status())
+					t = 0
 			except Exception, e:
 				print(e)
 				time.sleep(60)
