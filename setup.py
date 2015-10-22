@@ -19,12 +19,12 @@ PyParade is a lightweight thread-based multiprocessing framework that makes it e
       keywords='big data parallel processing',
       author='Nils Breyer',
       author_email='mail@nilsbreyer.eu',
-      url='nilsbreyer.eu/#!projects/pyparade',
+      url='http://nilsbreyer.eu/#!projects/pyparade',
       license='MIT License',
       packages=find_packages(),
       include_package_data=True,
       zip_safe=True,
       install_requires=[
-          "futures>=3.0"
+
       ]
       )

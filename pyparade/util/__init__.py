@@ -1,5 +1,5 @@
 # coding=utf8
-import multiprocessing, time, math
+import multiprocessing, time, math, traceback
 from threading import Event, Thread
 
 def sstr(obj):
@@ -98,6 +98,8 @@ class ParMap(object):
 			try:
 				results.append(self.map_func(value))
 			except Exception, e:
+				traceback.print_stack()
+				print(e)
 				self.jobs[jobid]["error"] = e
 				self.jobs[jobid]["stopped"] = time.time()
 				return

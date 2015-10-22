@@ -1,7 +1,5 @@
 import threading, multiprocessing, Queue, time, collections
 
-from concurrent import futures
-
 from pyparade.util import ParMap
 from pyparade.util.btree import BTree
 
