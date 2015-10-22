@@ -45,7 +45,7 @@ class ParMap(object):
 
 				slow_start_weight = 0.8 - 0.5*len(last_processing_times)/(10*self.num_workers) #update chunksize slowly in the beginning
 				desired_chunksize = int(math.ceil(slow_start_weight*self.chunksize + (1.0-slow_start_weight)*3/avg_processing_time)) #batch should take 3s to calculate
-				self.chunksize = min(desired_chunksize, 2*self.chunksize) #double chunksize at most every time
+				self.chunksize = min(desired_chunksize, max(10,2*self.chunksize)) #double chunksize at most every time (but allow to go to 10 directly in the beginning)
 
 				if "error" in self.jobs[minjobid]:
 					raise self.jobs[minjobid]["error"]
