@@ -10,6 +10,38 @@ def sstr(obj):
 	except UnicodeEncodeError:
 		return unicode(obj).encode('utf-8')
 
+class Event(object):
+	def __init__(self):
+		self.handlers = []
+	
+	def add(self, handler):
+		self.handlers.append(handler)
+		return self
+	
+	def remove(self, handler):
+		self.handlers.remove(handler)
+		return self
+	
+	def fire(self, sender, earg=None):
+		for handler in self.handlers:
+			handler(sender, earg)
+	
+	__iadd__ = add
+	__isub__ = remove
+	__call__ = fire
+
+class Timer(object):
+	"""measures time"""
+	def __init__(self, description):
+		super(Timer, self).__init__()
+		self.start = time.time()
+		self.description = description
+
+	def stop(self):
+		self.end = time.time()
+		self.seconds = self.end-self.start
+		print(self.description + " took " + str(self.seconds) + "s.")
+
 class ParMap(object):
 	"""Parallel executes a map in several threads"""
 	def __init__(self, map_func, num_workers=multiprocessing.cpu_count()):
