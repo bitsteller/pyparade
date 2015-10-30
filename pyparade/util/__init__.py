@@ -62,6 +62,12 @@ class Timer(object):
 class ParMap(object):
 	"""Parallel executes a map in several processes"""
 	def __init__(self, map_func, context_func = None, num_workers=multiprocessing.cpu_count()):
+		"""A parallel implementation of map() that uses multiple processes to divide the compuation.
+		Args:
+			map_func: the function to apply to each element
+			context_func: an optional function that returns a context object (that could be used in a with block). The function is called once for each worker and the context object is passed to the map_func.
+			num_workers: the number of worker processes to spawn (defaults to the number of CPU cores available)
+		"""
 		super(ParMap, self).__init__()
 		self.map_func = map_func
 		self.context_func = context_func
@@ -75,9 +81,20 @@ class ParMap(object):
 		return self._chunksize
 
 	def stop(self):
+		"""Requests all active workers connected to a running parallel mapping to stop.
+		Note that stopping workers is done asynchrously and can take while, even though this function returns immediately."""
+
 		self.request_stop.set()
 
 	def map(self, iterable):
+		"""Applies the map_func of the ParMap object to all elements in the iterable using parallel worker processes. The result is returned as a generator.
+		An optimal chunksize that is submitted to the workers is calculated dynamically.
+		Results are calculated on demand, meaning that you have to loop through the generator to continue processing.
+		Elements in the iterable have to be pickable to be able to submit them to worker processes.
+		
+		Args:
+			iterable: an iterable (list or generator) that map_func is applied to
+		"""
 		#initialize
 		workers = []
 		free_workers = Queue.Queue()
