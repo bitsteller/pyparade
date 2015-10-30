@@ -7,7 +7,7 @@ setup(name='pyparade',
       version=version,
       description="Python library to parallel process data efficiently",
       long_description="""\
-PyParade is a lightweight thread-based multiprocessing framework that makes it easy to parallel process large-scale datasets efficiently.""",
+PyParade is a lightweight multiprocessing framework that makes it easy to parallel process large-scale datasets efficiently.""",
       classifiers=["License :: OSI Approved :: MIT License",
                    "Development Status :: 3 - Alpha",
                    "Environment :: Console",

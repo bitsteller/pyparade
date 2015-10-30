@@ -1,5 +1,5 @@
 # coding=utf8
-import multiprocessing, time, math, traceback
+import multiprocessing, time, math, traceback, Queue
 from multiprocessing import Process
 import multiprocessing
 
@@ -44,11 +44,13 @@ class Timer(object):
 
 class ParMap(object):
 	"""Parallel executes a map in several threads"""
-	def __init__(self, map_func, num_workers=multiprocessing.cpu_count()):
+	def __init__(self, map_func, context_func = None, num_workers=multiprocessing.cpu_count()):
 		super(ParMap, self).__init__()
 		self.map_func = map_func
+		self.context_func = context_func
 		self.num_workers = num_workers
-		self.jobs = {}
+		self.workers = []
+		self.free_workers = Queue.Queue()
 		self.request_stop = multiprocessing.Event()
 		self.chunksize = 1
 
@@ -56,88 +58,128 @@ class ParMap(object):
 		self.request_stop.set()
 
 	def map(self, iterable):
+		#initialize
+		self.workers = []
+		self.free_workers = Queue.Queue()
+		self.request_stop = multiprocessing.Event()
+		self.chunksize = 1
+
+		#start up workers
+		for i in range(self.num_workers):
+			parent_conn, child_conn = multiprocessing.Pipe()
+			worker = {} 
+			worker["connection"] =  parent_conn
+			worker["process"] = Process(target = self._work, args=(child_conn, self.context_func))
+			self.workers.append(worker)
+			self.free_workers.put(worker)
+			worker["process"].start()
+
+		#process values
+		jobs = {}
 		jobid = 0
 		batch = []
 		last_processing_times = []
 
 		for value in iterable:
-			#wait as long as all jobs are processing
-			active_jobs = filter(lambda job: job["thread"].is_alive(), self.jobs.itervalues())
-			while len(active_jobs) >= self.num_workers:
-				time.sleep(0.1)
-				for job in active_jobs:
-					if job["connection"].poll():
-						job.update(job["connection"].recv())
-						active_jobs.remove(job)
+			#wait as long as all workers are busy
+			while self.free_workers.empty():
+				minjobid = min(jobs.iterkeys())
+				jobs[minjobid]["worker"]["connection"].poll(1)
+				for job in jobs.itervalues():
+					if (not "stopped" in job) and job["worker"]["connection"].poll():
+						job.update(job["worker"]["connection"].recv())
+						self.free_workers.put(job["worker"])
 
 			#yield results while leftmost batch is ready
-			while len(self.jobs) > 0 and (not self.jobs[min(self.jobs.iterkeys())]["thread"].is_alive() or self.jobs[min(self.jobs.iterkeys())]["connection"].poll()): 
-				minjobid = min(self.jobs.iterkeys())
-				if self.jobs[minjobid]["connection"].poll(0.5):
-					self.jobs[minjobid].update(self.jobs[minjobid]["connection"].recv())
-					self.jobs[minjobid]["connection"].close()
+			while len(jobs) > 0 and ("stopped" in jobs[min(jobs.iterkeys())] or jobs[min(jobs.iterkeys())]["worker"]["connection"].poll()): 
+				minjobid = min(jobs.iterkeys())
+				if jobs[minjobid]["worker"]["connection"].poll():
+					jobs[minjobid].update(jobs[minjobid]["worker"]["connection"].recv())
+					self.free_workers.put(jobs[minjobid]["worker"])
 
 				#update optimal chunksize based on 10*workers last batch processing times
 				while len(last_processing_times) > 10*self.num_workers:
 					last_processing_times.pop(0)
 
-				last_processing_times.append((self.jobs[minjobid]["stopped"] - self.jobs[minjobid]["started"])/self.chunksize)
+				last_processing_times.append((jobs[minjobid]["stopped"] - jobs[minjobid]["started"])/self.chunksize)
 				avg_processing_time = sum(last_processing_times)/len(last_processing_times)
 
 				slow_start_weight = 0.8 - 0.5*len(last_processing_times)/(10*self.num_workers) #update chunksize slowly in the beginning
 				desired_chunksize = int(math.ceil(slow_start_weight*self.chunksize + (1.0-slow_start_weight)*3.0/avg_processing_time)) #batch should take 1s to calculate
 				self.chunksize = min(desired_chunksize, max(10,2*self.chunksize)) #double chunksize at most every time (but allow to go to 10 directly in the beginning)
 
-				if "error" in self.jobs[minjobid]:
-					raise self.jobs[minjobid]["error"]
+				if "error" in jobs[minjobid]:
+					raise jobs[minjobid]["error"]
 
-				for r in self.jobs[minjobid]["results"]:
+				for r in jobs[minjobid]["results"]:
 					yield r
-				del self.jobs[minjobid]
-
+				del jobs[minjobid]
 
 			#start new job if batch full
 			batch.append(value)
 
 			if len(batch) >= self.chunksize:
-				if len(self.jobs) > 10*self.num_workers: #do not start jobs for more than 10*workers batches ahead to save memory
+				if len(jobs) > 10*self.num_workers: #do not start jobs for more than 10*workers batches ahead to save memory
 					time.sleep(0.1)
 				else:
 					job = {}
-					self.jobs[jobid] = job
-					parent_conn, child_conn = multiprocessing.Pipe(duplex = False)
-					job["connection"] = parent_conn
-					job["thread"] = Process(target = self._map_batch, args=(child_conn, batch))#Thread(target = self._map_batch, args=(jobid, batch))
+					jobs[jobid] = job
 					job["started"] = time.time()
-					job["thread"].start()
+					job["worker"] = self.free_workers.get()
+					job["worker"]["connection"].send(batch)
 
 					batch = []
 					jobid += 1
 
+		#submit last batch
 		job = {}
-		self.jobs[jobid] = job
-		parent_conn, child_conn = multiprocessing.Pipe(duplex = False)
-		job["connection"] = parent_conn
-		job["thread"] = Process(target = self._map_batch, args=(child_conn, batch))# Thread(target = self._map_batch, args=(jobid, batch))
+		jobs[jobid] = job
 		job["started"] = time.time()
-		job["thread"].start()
+		job["worker"] = self.free_workers.get()
+		job["worker"]["connection"].send(batch)
 		batch = []
 
-		while len(self.jobs) > 0:
-			minjobid = min(self.jobs.iterkeys())
-			if not self.jobs[minjobid]["thread"].is_alive() or self.jobs[minjobid]["connection"].poll():
-				if self.jobs[minjobid]["connection"].poll():
-					self.jobs[minjobid].update(self.jobs[minjobid]["connection"].recv())
-					self.jobs[minjobid]["connection"].close()
+		#wait for all jobs to finish
+		while len(jobs) > 0:
+			minjobid = min(jobs.iterkeys())
+			jobs[minjobid]["worker"]["connection"].poll(1)
+			if "stopped" in jobs[minjobid] or jobs[minjobid]["worker"]["connection"].poll():
+				if jobs[minjobid]["worker"]["connection"].poll():
+					jobs[minjobid].update(jobs[minjobid]["worker"]["connection"].recv())
+					self.free_workers.put(jobs[minjobid]["worker"])
 
-				if "error" in self.jobs[minjobid]:
-					raise self.jobs[minjobid]["error"]
+				if "error" in jobs[minjobid]:
+					raise jobs[minjobid]["error"]
 
-				for r in self.jobs[minjobid]["results"]:
+				for r in jobs[minjobid]["results"]:
 					yield r
-				del self.jobs[minjobid]
+				del jobs[minjobid]
 
-	def _map_batch(self, conn, batch):
+		#shutdown workers
+		for worker in self.workers:
+			try:
+				worker["connection"].send(None) #send shutdown command
+				worker["connection"].close()
+			except Exception, e:
+				pass
+
+		self.workers = []
+
+	def _work(self, conn, context_func):
+		if context_func != None:
+			with context_func() as c:
+				batch = conn.recv()
+				while batch != None and not self.request_stop.is_set():
+					self._map_batch(conn, batch, c)
+					batch = conn.recv()
+		else:
+			batch = conn.recv()
+			while batch != None and not self.request_stop.is_set():
+				self._map_batch(conn, batch)
+				batch = conn.recv()
+		conn.close()
+
+	def _map_batch(self, conn, batch, context = None):
 		results = []
 		for value in batch:
 			if self.request_stop.is_set():
@@ -145,10 +187,12 @@ class ParMap(object):
 				jobinfo["error"] = StandardError("stop requested")
 				jobinfo["stopped"] = time.time()
 				conn.send(jobinfo)
-				conn.close()
 				return
 			try:
-				results.append(self.map_func(value))
+				if context:
+					results.append(self.map_func(value, context))
+				else:
+					results.append(self.map_func(value))
 			except Exception, e:
 				traceback.print_stack()
 				print(e)
@@ -156,11 +200,9 @@ class ParMap(object):
 				jobinfo["error"] = e
 				jobinfo["stopped"] = time.time()
 				conn.send(jobinfo)
-				conn.close()
 				return
 
 		jobinfo = {}
 		jobinfo["stopped"] = time.time()
 		jobinfo["results"] = results
 		conn.send(jobinfo)
-		conn.close()
