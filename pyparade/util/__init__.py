@@ -61,7 +61,7 @@ class Timer(object):
 
 class ParMap(object):
 	"""Parallel executes a map in several processes"""
-	def __init__(self, map_func, context_func = None, num_workers=multiprocessing.cpu_count()):
+	def __init__(self, map_func, num_workers=multiprocessing.cpu_count(), context_func = None):
 		"""A parallel implementation of map() that uses multiple processes to divide the compuation.
 		Args:
 			map_func: the function to apply to each element

@@ -30,7 +30,7 @@ class Source(object):
 			self._stop_requested.set()
 
 class Operation(Source):
-	def __init__(self, source, num_workers=multiprocessing.cpu_count(), initializer = None):
+	def __init__(self, source, num_workers=multiprocessing.cpu_count(), context_func = None):
 		super(Operation, self).__init__()
 		self.source = source
 		self.inbuffer = source._get_buffer()
@@ -41,6 +41,7 @@ class Operation(Source):
 		self.time_started = None
 		self.time_finished = None
 		self.num_workers = num_workers
+		self.context_func = context_func
 
 	def __call__(self):
 		self.running.set()
@@ -76,7 +77,7 @@ class Operation(Source):
 
 	def _output(self, value):
 		self._outbatch.append(value)
-		if time.time() - self._last_output > 1:
+		if time.time() - self._last_output > 0.5:
 			self._flush_output()
 
 	def _flush_output(self):
@@ -103,8 +104,8 @@ class Operation(Source):
 
 
 class MapOperation(Operation):
-	def __init__(self, source, map_func, num_workers=multiprocessing.cpu_count(), initializer = None):
-		super(MapOperation, self).__init__(source, num_workers, initializer)
+	def __init__(self, source, map_func, num_workers=multiprocessing.cpu_count(), context_func = None):
+		super(MapOperation, self).__init__(source, num_workers, context_func)
 		self.map_func = map_func
 		self.pool = None #multiprocessing.Pool(num_workers, maxtasksperchild = 1000, initializer = initializer)
 
@@ -112,7 +113,7 @@ class MapOperation(Operation):
 		return "Map"
 
 	def run(self):
-		self.pool = ParMap(self.map_func, self.num_workers)
+		self.pool = ParMap(self.map_func, num_workers = self.num_workers, context_func = self.context_func)
 		#map
 		result = []
 		for response in self.pool.map(self._generate_input()):
@@ -125,14 +126,14 @@ class MapOperation(Operation):
 
 class FlatMapOperation(MapOperation):
 	"""Calls the map function for every value in the dataset and then flattens the result"""
-	def __init__(self, source, map_func, num_workers=multiprocessing.cpu_count(), initializer = None):
-		super(FlatMapOperation, self).__init__(source, map_func, num_workers, initializer)
+	def __init__(self, source, map_func, num_workers=multiprocessing.cpu_count(), context_func = None):
+		super(FlatMapOperation, self).__init__(source, map_func, num_workers, context_func)
 
 	def __str__(self):
 		return "FlatMap"
 
 	def run(self):
-		self.pool = ParMap(self.map_func, self.num_workers)
+		self.pool = ParMap(self.map_func, num_workers = self.num_workers, context_func = self.context_func)
 		#map
 		result = []
 		for response in self.pool.map(self._generate_input()):
@@ -147,8 +148,8 @@ class FlatMapOperation(MapOperation):
 		
 class GroupByKeyOperation(Operation):
 	"""docstring for GroupByKeyOperation"""
-	def __init__(self, source, partly = False, num_workers=multiprocessing.cpu_count(), initializer = None):
-		super(GroupByKeyOperation, self).__init__(source, num_workers, initializer)
+	def __init__(self, source, partly = False, num_workers=multiprocessing.cpu_count()):
+		super(GroupByKeyOperation, self).__init__(source, num_workers)
 		self.partly = partly
 
 	def __str__(self):
@@ -179,7 +180,7 @@ class GroupByKeyOperation(Operation):
 			for k, v in zip(leaf.keys, leaf.values):
 				self._output((k,v))
 
-	def run(self, chunksize=100):
+	def run(self, chunksize=10):
 		if self.partly:
 			return self.run_partly(chunksize)
 
@@ -204,8 +205,8 @@ class GroupByKeyOperation(Operation):
 
 class FoldOperation(Operation):
 	"""Folds the dataset using a combine function"""
-	def __init__(self, source, zero_value, fold_func, num_workers=multiprocessing.cpu_count(), initializer = None):
-		super(FoldOperation, self).__init__(source, num_workers, initializer)
+	def __init__(self, source, zero_value, fold_func, num_workers=multiprocessing.cpu_count(), context_func = None):
+		super(FoldOperation, self).__init__(source, num_workers, context_func)
 		self.pool = None #ParMap(self._fold_batch, num_workers = num_workers) #futures.ThreadPoolExecutor(num_workers)
 		self.zero_value = zero_value
 		self.fold_func = fold_func
@@ -229,8 +230,8 @@ class FoldOperation(Operation):
 			result = self.fold_func(result, value)
 		return result
 
-	def run(self, chunksize = 100):
-		self.pool = ParMap(self._fold_batch, num_workers = self.num_workers)
+	def run(self, chunksize = 10):
+		self.pool = ParMap(self._fold_batch, num_workers = self.num_workers, context_func = self.context_func)
 		result = []
 
 		for response in self.pool.map(self._generate_input_batches(chunksize = chunksize)):

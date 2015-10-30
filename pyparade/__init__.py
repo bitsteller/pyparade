@@ -63,7 +63,7 @@ class Dataset(operations.Source):
 			if self._length_is_estimated:
 				self._length += 1
 
-			if time.time() - last_insert > 1:
+			if time.time() - last_insert > 0.5:
 				[buf.put(batch) for buf in self._buffers]
 				batch = []
 				last_insert = time.time()
@@ -85,20 +85,20 @@ class Dataset(operations.Source):
 	def length_is_estimated(self):
 		return self._length_is_estimated
 
-	def map(self, map_func):
-		op = operations.MapOperation(self, map_func)
+	def map(self, map_func, context_func = None):
+		op = operations.MapOperation(self, map_func, context_func = context_func)
 		return Dataset(op)
 
-	def flat_map(self, map_func):
-		op = operations.FlatMapOperation(self, map_func)
+	def flat_map(self, map_func, context_func = None):
+		op = operations.FlatMapOperation(self, map_func, context_func = context_func)
 		return Dataset(op)
 
 	def group_by_key(self, partly = False):
 		op = operations.GroupByKeyOperation(self, partly = partly)
 		return Dataset(op)
 
-	def fold(self, zero_value, fold_func):
-		op = operations.FoldOperation(self, zero_value, fold_func)
+	def fold(self, zero_value, fold_func, context_func = None):
+		op = operations.FoldOperation(self, zero_value, fold_func, context_func = context_func)
 		return Dataset(op)
 
 class Buffer(object):
@@ -148,7 +148,7 @@ class ParallelProcess(object):
 		self.chain = chain
 
 		#set number of workers
-		for operation in [block for block in chain if isinstance(block,operations.Operation)]:
+		for operation in [block for block in chain if isinstance(block, operations.Operation)]:
 			operation.num_workers = num_workers
 
 		started = time.time()
