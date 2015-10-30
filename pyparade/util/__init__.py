@@ -11,18 +11,30 @@ def sstr(obj):
 		return unicode(obj).encode('utf-8')
 
 class Event(object):
+	"""An event that can have multiple handlers """
 	def __init__(self):
 		self.handlers = []
 	
 	def add(self, handler):
+		"""Add a handler that is called when the event fires
+		Args:
+			handler: a callable that is called when the event is fired. 
+			The arguments passed to the handler are the sender and additionally arguments that were passed to the fire() function"""
 		self.handlers.append(handler)
 		return self
 	
 	def remove(self, handler):
+		"""Removes a handler, such that it is no no longer called when the event fires
+		Args:
+			handler: the handler function to remove"""
 		self.handlers.remove(handler)
 		return self
 	
 	def fire(self, sender, earg=None):
+		"""Fires the event and calls all registered handlers
+		Args:
+			sender: the object that fired the event
+			earg: Optional argument containing additional information that should be passed to all handlers"""
 		for handler in self.handlers:
 			handler(sender, earg)
 	
@@ -31,38 +43,46 @@ class Event(object):
 	__call__ = fire
 
 class Timer(object):
-	"""measures time"""
+	"""Measures time from when the timer is created and until stop() is called"""
 	def __init__(self, description):
+		"""Creates a new timer and starts it.
+		Args:
+			description: a description of what is measured
+		"""
 		super(Timer, self).__init__()
 		self.start = time.time()
 		self.description = description
 
 	def stop(self):
+		"""Stops the timer. Prints the number of seconds elapsed on console"""
 		self.end = time.time()
 		self.seconds = self.end-self.start
 		print(self.description + " took " + str(self.seconds) + "s.")
 
 class ParMap(object):
-	"""Parallel executes a map in several threads"""
+	"""Parallel executes a map in several processes"""
 	def __init__(self, map_func, context_func = None, num_workers=multiprocessing.cpu_count()):
 		super(ParMap, self).__init__()
 		self.map_func = map_func
 		self.context_func = context_func
 		self.num_workers = num_workers
-		self.workers = []
-		self.free_workers = Queue.Queue()
 		self.request_stop = multiprocessing.Event()
-		self.chunksize = 1
+		self._chunksize = 1
+		self.chunkseconds = 3.0
+
+	@property
+	def chunksize(self):
+		return self._chunksize
 
 	def stop(self):
 		self.request_stop.set()
 
 	def map(self, iterable):
 		#initialize
-		self.workers = []
-		self.free_workers = Queue.Queue()
+		workers = []
+		free_workers = Queue.Queue()
 		self.request_stop = multiprocessing.Event()
-		self.chunksize = 1
+		self._chunksize = 1
 
 		#start up workers
 		for i in range(self.num_workers):
@@ -70,43 +90,41 @@ class ParMap(object):
 			worker = {} 
 			worker["connection"] =  parent_conn
 			worker["process"] = Process(target = self._work, args=(child_conn, self.context_func))
-			self.workers.append(worker)
-			self.free_workers.put(worker)
+			workers.append(worker)
+			free_workers.put(worker)
 			worker["process"].start()
 
 		#process values
 		jobs = {}
 		jobid = 0
 		batch = []
-		last_processing_times = []
+		last_processing_times = [self.chunkseconds] * 10*self.num_workers #init with chunkseconds, such that intial chunksize is 1
+		last_processing_time_pos = 0
 
 		for value in iterable:
 			#wait as long as all workers are busy
-			while self.free_workers.empty():
+			while free_workers.empty():
 				minjobid = min(jobs.iterkeys())
 				jobs[minjobid]["worker"]["connection"].poll(1)
 				for job in jobs.itervalues():
 					if (not "stopped" in job) and job["worker"]["connection"].poll():
 						job.update(job["worker"]["connection"].recv())
-						self.free_workers.put(job["worker"])
+						free_workers.put(job["worker"])
 
 			#yield results while leftmost batch is ready
 			while len(jobs) > 0 and ("stopped" in jobs[min(jobs.iterkeys())] or jobs[min(jobs.iterkeys())]["worker"]["connection"].poll()): 
 				minjobid = min(jobs.iterkeys())
 				if jobs[minjobid]["worker"]["connection"].poll():
 					jobs[minjobid].update(jobs[minjobid]["worker"]["connection"].recv())
-					self.free_workers.put(jobs[minjobid]["worker"])
+					free_workers.put(jobs[minjobid]["worker"])
 
 				#update optimal chunksize based on 10*workers last batch processing times
-				while len(last_processing_times) > 10*self.num_workers:
-					last_processing_times.pop(0)
+				last_processing_times[last_processing_time_pos] = (jobs[minjobid]["stopped"] - jobs[minjobid]["started"])/self._chunksize
+				last_processing_time_pos = (last_processing_time_pos + 1) % (10*self.num_workers) #rotate through list with last processing times
 
-				last_processing_times.append((jobs[minjobid]["stopped"] - jobs[minjobid]["started"])/self.chunksize)
 				avg_processing_time = sum(last_processing_times)/len(last_processing_times)
-
-				slow_start_weight = 0.8 - 0.5*len(last_processing_times)/(10*self.num_workers) #update chunksize slowly in the beginning
-				desired_chunksize = int(math.ceil(slow_start_weight*self.chunksize + (1.0-slow_start_weight)*3.0/avg_processing_time)) #batch should take 1s to calculate
-				self.chunksize = min(desired_chunksize, max(10,2*self.chunksize)) #double chunksize at most every time (but allow to go to 10 directly in the beginning)
+				desired_chunksize = int(math.ceil(self.chunkseconds/avg_processing_time)) #batch should take 1s to calculate
+				self._chunksize = min(desired_chunksize, max(10,2*self._chunksize)) #double chunksize at most every time (but allow to go to 10 directly in the beginning)
 
 				if "error" in jobs[minjobid]:
 					raise jobs[minjobid]["error"]
@@ -118,14 +136,14 @@ class ParMap(object):
 			#start new job if batch full
 			batch.append(value)
 
-			if len(batch) >= self.chunksize:
+			if len(batch) >= self._chunksize:
 				if len(jobs) > 10*self.num_workers: #do not start jobs for more than 10*workers batches ahead to save memory
 					time.sleep(0.1)
 				else:
 					job = {}
 					jobs[jobid] = job
 					job["started"] = time.time()
-					job["worker"] = self.free_workers.get()
+					job["worker"] = free_workers.get()
 					job["worker"]["connection"].send(batch)
 
 					batch = []
@@ -135,7 +153,7 @@ class ParMap(object):
 		job = {}
 		jobs[jobid] = job
 		job["started"] = time.time()
-		job["worker"] = self.free_workers.get()
+		job["worker"] = free_workers.get()
 		job["worker"]["connection"].send(batch)
 		batch = []
 
@@ -146,7 +164,7 @@ class ParMap(object):
 			if "stopped" in jobs[minjobid] or jobs[minjobid]["worker"]["connection"].poll():
 				if jobs[minjobid]["worker"]["connection"].poll():
 					jobs[minjobid].update(jobs[minjobid]["worker"]["connection"].recv())
-					self.free_workers.put(jobs[minjobid]["worker"])
+					free_workers.put(jobs[minjobid]["worker"])
 
 				if "error" in jobs[minjobid]:
 					raise jobs[minjobid]["error"]
@@ -156,14 +174,14 @@ class ParMap(object):
 				del jobs[minjobid]
 
 		#shutdown workers
-		for worker in self.workers:
+		for worker in workers:
 			try:
 				worker["connection"].send(None) #send shutdown command
 				worker["connection"].close()
 			except Exception, e:
 				pass
 
-		self.workers = []
+		workers = []
 
 	def _work(self, conn, context_func):
 		if context_func != None:
