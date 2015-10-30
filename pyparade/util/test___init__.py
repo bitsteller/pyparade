@@ -1,5 +1,5 @@
 import random
-import unittest
+import unittest, time, threading
 
 from pyparade.util import Event, ParMap, Timer
 
@@ -34,6 +34,24 @@ class TestEvent(unittest.TestCase):
 class TestParMap(unittest.TestCase):
 	"""Tests parallelized map"""
 
+	def test_stop(self):
+		def f(a):
+			for i in range(0,1000):
+				random.random()
+
+			return ((a + 1) % 100000, a+1)
+
+		def m():
+			p.map(range(1000000))
+
+		p = ParMap(f)
+		t = threading.Thread(target=m)
+		t.start()
+		time.sleep(10)
+		p.stop()
+		time.sleep(10)
+		self.assertTrue(not t.is_alive())
+
 	def test_plus_one(self):
 		def f(a):
 			for i in range(0,1000):
@@ -43,6 +61,8 @@ class TestParMap(unittest.TestCase):
 
 		p = ParMap(f)
 		t_par = Timer("parmap")
+		#for r in p.map(range(1000000)):
+		#	print(r)
 		calculated_values = [v for v in p.map(range(1000000))]
 		t_par.stop()
 		t_map = Timer("map")
@@ -51,3 +71,6 @@ class TestParMap(unittest.TestCase):
 		self.assertLessEqual(t_par.seconds, 0.8*t_map.seconds)
 		for calculated_value, correct_value in zip(calculated_values, correct_values):
 			self.assertEqual(correct_value, calculated_value)
+
+
+
