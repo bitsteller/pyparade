@@ -167,18 +167,18 @@ class ParMap(object):
 					jobid += 1
 
 		#submit last batch
-		job = {}
-		jobs[jobid] = job
-		job["started"] = time.time()
-		job["worker"] = free_workers.get()
-		job["worker"]["connection"].send(batch)
-		batch = []
+		if len(batch) > 0:
+			job = {}
+			jobs[jobid] = job
+			job["started"] = time.time()
+			job["worker"] = free_workers.get()
+			job["worker"]["connection"].send(batch)
+			batch = []
 
 		#wait for all jobs to finish
 		while len(jobs) > 0:
-			minjobid = min(jobs.iterkeys())
-			jobs[minjobid]["worker"]["connection"].poll(1)
-			if "stopped" in jobs[minjobid] or jobs[minjobid]["worker"]["connection"].poll():
+			if ("stopped" in jobs[min(jobs.iterkeys())] or jobs[min(jobs.iterkeys())]["worker"]["connection"].poll(1)):
+				minjobid = min(jobs.iterkeys())
 				if jobs[minjobid]["worker"]["connection"].poll():
 					jobs[minjobid].update(jobs[minjobid]["worker"]["connection"].recv())
 					free_workers.put(jobs[minjobid]["worker"])
@@ -195,10 +195,9 @@ class ParMap(object):
 			try:
 				worker["connection"].send(None) #send shutdown command
 				worker["connection"].close()
+				worker["process"].join()
 			except Exception, e:
 				pass
-
-		workers = []
 
 	def _work(self, conn, context_func):
 		if context_func != None:
