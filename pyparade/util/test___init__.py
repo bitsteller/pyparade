@@ -63,7 +63,7 @@ class TestParMap(unittest.TestCase):
 		t_par = Timer("parmap")
 		#for r in p.map(range(1000000)):
 		#	print(r)
-		calculated_values = [v for v in p.map(range(1000000))]
+		calculated_values = [v for v in p.map(range(10000000))]
 		t_par.stop()
 		t_map = Timer("map")
 		correct_values = map(f,range(1000000))
@@ -73,5 +73,24 @@ class TestParMap(unittest.TestCase):
 			self.assertEqual(correct_value, calculated_value)
 		self.assertEqual(len(correct_values), len(calculated_values))
 
+	def test_vary_time(self):
+		def f(a):
+			for i in range(0,random.randint(1,10000000)):
+				random.random()
+
+			return ((a + 1) % 100000, a+1)
+
+		p = ParMap(f)
+		t_par = Timer("parmap")
+		#for r in p.map(range(1000000)):
+		#	print(r)
+		calculated_values = [v for v in p.map(range(10000000))]
+		t_par.stop()
+		t_map = Timer("map")
+		correct_values = map(f,range(100000))
+		t_map.stop()
+		for calculated_value, correct_value in zip(calculated_values, correct_values):
+			self.assertEqual(correct_value, calculated_value)
+		self.assertEqual(len(correct_values), len(calculated_values))
 
 

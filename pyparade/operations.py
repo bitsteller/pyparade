@@ -197,11 +197,35 @@ class GroupByKeyOperation(Operation):
 			self.processed += 1
 
 		keyleafs = [l for l in tree.get_leafs()]
-		#keys, leafs = zip(*tree.get_leafs())
 		for key, leaf in keyleafs:
 			for k, v in zip(leaf.keys, leaf.values):
 				self._output((k,v))
 
+class ReduceByKeyOperation(Operation):
+	"""docstring for GroupByKeyOperation"""
+	def __init__(self, source, reduce_func, num_workers=multiprocessing.cpu_count()):
+		super(ReduceByKeyOperation, self).__init__(source, num_workers)
+
+	def __str__(self):
+		return "ReduceByKey"
+
+	def run(self, chunksize=10):
+		tree = BTree(chunksize, None, None)
+
+		for k, v in self._generate_input():
+			if self._check_stop():
+				return
+
+			if k in tree:
+				tree[k] = self.reduce_func(tree[k], v)
+			else:
+				tree[k] = v
+			self.processed += 1
+
+		keyleafs = [l for l in tree.get_leafs()]
+		for key, leaf in keyleafs:
+			for k, v in zip(leaf.keys, leaf.values):
+				self._output((k,v))
 
 class FoldOperation(Operation):
 	"""Folds the dataset using a combine function"""

@@ -97,6 +97,10 @@ class Dataset(operations.Source):
 		op = operations.GroupByKeyOperation(self, partly = partly)
 		return Dataset(op)
 
+	def reduce_by_key(self, reduce_func):
+		op = operations.ReduceByKeyOperation(self, reduce_func)
+		return Dataset(op)
+
 	def fold(self, zero_value, fold_func, context_func = None):
 		op = operations.FoldOperation(self, zero_value, fold_func, context_func = context_func)
 		return Dataset(op)
