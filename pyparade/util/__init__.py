@@ -142,6 +142,7 @@ class ParMap(object):
 				avg_processing_time = sum(last_processing_times)/len(last_processing_times)
 				desired_chunksize = int(math.ceil(self.chunkseconds/avg_processing_time)) #batch should take 1s to calculate
 				self._chunksize = min(desired_chunksize, max(10,2*self._chunksize)) #double chunksize at most every time (but allow to go to 10 directly in the beginning)
+				#print(self._chunksize)
 
 				if "error" in jobs[minjobid]:
 					raise jobs[minjobid]["error"]
@@ -177,6 +178,8 @@ class ParMap(object):
 
 		#wait for all jobs to finish
 		while len(jobs) > 0:
+			#for job in jobs.itervalues():
+				#print("waiting for " + str(job["worker"]["process"].pid))
 			if ("stopped" in jobs[min(jobs.iterkeys())] or jobs[min(jobs.iterkeys())]["worker"]["connection"].poll(1)):
 				minjobid = min(jobs.iterkeys())
 				if jobs[minjobid]["worker"]["connection"].poll():
@@ -239,4 +242,5 @@ class ParMap(object):
 		jobinfo = {}
 		jobinfo["stopped"] = time.time()
 		jobinfo["results"] = results
+		#print("done:" + str(multiprocessing.current_process().pid))
 		conn.send(jobinfo)

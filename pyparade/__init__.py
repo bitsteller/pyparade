@@ -258,7 +258,7 @@ class ParallelProcess(object):
 			if self.dataset._stop_requested.is_set():
 				raise RuntimeError("Process was stopped")
 			result.append(val)
-		print(result)
+		#print(result)
 		return result
 			#time.sleep(1)
 		#return self.buffer.generate()
