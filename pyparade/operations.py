@@ -158,6 +158,8 @@ class GroupByKeyOperation(Operation):
 	def run_partly(self, chunksize):
 		tree = BTree(chunksize, None, None)
 
+		items_since_last_group = 0
+		last_key = None
 		for k, v in self._generate_input():
 			if self._check_stop():
 				return
@@ -167,13 +169,17 @@ class GroupByKeyOperation(Operation):
 			else:
 				tree[k] = [v]
 			self.processed += 1
+			items_since_last_group += 1
 
-			if self.processed % (chunksize*self.num_workers) == 0:
+			if items_since_last_group >= (chunksize*self.num_workers) and k != last_key: #only output elements periodically and once key changes
 				keyleafs = [l for l in tree.get_leafs()]
 				for key, leaf in keyleafs:
 					for k, v in zip(leaf.keys, leaf.values):
 						self._output((k,v))
 				tree = BTree(chunksize, None, None)
+				items_since_last_group = 0
+
+			last_key = k
 
 		keyleafs = [l for l in tree.get_leafs()]
 		for key, leaf in keyleafs:
