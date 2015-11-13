@@ -167,6 +167,15 @@ class ParMap(object):
 					batch = []
 					jobid += 1
 
+		#wait while all workers busy
+		while free_workers.empty():
+			minjobid = min(jobs.iterkeys())
+			jobs[minjobid]["worker"]["connection"].poll(1)
+			for job in jobs.itervalues():
+				if (not "stopped" in job) and job["worker"]["connection"].poll():
+					job.update(job["worker"]["connection"].recv())
+					free_workers.put(job["worker"])
+
 		#submit last batch
 		if len(batch) > 0:
 			job = {}
