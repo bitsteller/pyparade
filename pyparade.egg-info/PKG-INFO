@@ -1,6 +1,6 @@
 Metadata-Version: 1.1
 Name: pyparade
-Version: 0.2.2.dev0
+Version: 0.2.2
 Summary: Python library to parallel process data efficiently
 Home-page: http://nilsbreyer.eu/#!projects/pyparade
 Author: Nils Breyer
