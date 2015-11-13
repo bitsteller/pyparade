@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 import sys, os
 
-version = '0.2.2'
+version = '0.2.3.dev0'
 
 setup(name='pyparade',
       version=version,
