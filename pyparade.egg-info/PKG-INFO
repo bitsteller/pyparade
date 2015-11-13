@@ -1,12 +1,12 @@
 Metadata-Version: 1.1
 Name: pyparade
-Version: 0.1.dev0
+Version: 0.2.2.dev0
 Summary: Python library to parallel process data efficiently
-Home-page: nilsbreyer.eu/#!projects/pyparade
+Home-page: http://nilsbreyer.eu/#!projects/pyparade
 Author: Nils Breyer
 Author-email: mail@nilsbreyer.eu
 License: MIT License
-Description: PyParade is a lightweight thread-based multiprocessing framework that makes it easy to parallel process large-scale datasets efficiently.
+Description: PyParade is a lightweight multiprocessing framework that makes it easy to parallel process large-scale datasets efficiently.
 Keywords: big data parallel processing
 Platform: UNKNOWN
 Classifier: License :: OSI Approved :: MIT License

@@ -204,10 +204,19 @@ class ParMap(object):
 
 	def _work(self, conn, context_func):
 		if context_func != None:
-			with context_func() as c:
+			try:
+				with context_func() as c:
+					batch = conn.recv()
+					while batch != None and not self.request_stop.is_set():
+						self._map_batch(conn, batch, c)
+						batch = conn.recv()
+			except Exception, e: #worker not initialized, return error for all incoming jobs
 				batch = conn.recv()
 				while batch != None and not self.request_stop.is_set():
-					self._map_batch(conn, batch, c)
+					jobinfo = {}
+					jobinfo["error"] = e
+					jobinfo["stopped"] = time.time()
+					conn.send(jobinfo)
 					batch = conn.recv()
 		else:
 			batch = conn.recv()
