@@ -187,6 +187,14 @@ class ParMap(object):
 					free_workers.put(jobs[minjobid]["worker"])
 
 				if "error" in jobs[minjobid]:
+					self.request_stop.set()
+					#shutdown workers
+					for worker in workers:
+						try:
+							worker["connection"].close()
+							worker["process"].join()
+						except Exception, e:
+							pass
 					raise jobs[minjobid]["error"]
 
 				for r in jobs[minjobid]["results"]:
