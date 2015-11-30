@@ -128,6 +128,11 @@ class ParMap(object):
 						job.update(job["worker"]["connection"].recv())
 						free_workers.put(job["worker"])
 
+			#if job limit reached, wait for leftmost job to finish
+			if len(jobs) >= 10*self.num_workers: #do not start jobs for more than 10*workers batches ahead to save memory
+				while not ("stopped" in jobs[min(jobs.iterkeys())] or jobs[min(jobs.iterkeys())]["worker"]["connection"].poll(0.1)):
+					pass
+
 			#yield results while leftmost batch is ready
 			while len(jobs) > 0 and ("stopped" in jobs[min(jobs.iterkeys())] or jobs[min(jobs.iterkeys())]["worker"]["connection"].poll()): 
 				minjobid = min(jobs.iterkeys())
@@ -155,17 +160,14 @@ class ParMap(object):
 			batch.append(value)
 
 			if len(batch) >= self._chunksize:
-				if len(jobs) > 10*self.num_workers: #do not start jobs for more than 10*workers batches ahead to save memory
-					time.sleep(0.1)
-				else:
-					job = {}
-					jobs[jobid] = job
-					job["started"] = time.time()
-					job["worker"] = free_workers.get()
-					job["worker"]["connection"].send(batch)
+				job = {}
+				jobs[jobid] = job
+				job["started"] = time.time()
+				job["worker"] = free_workers.get()
+				job["worker"]["connection"].send(batch)
 
-					batch = []
-					jobid += 1
+				batch = []
+				jobid += 1
 
 		#wait while all workers busy
 		while free_workers.empty():
