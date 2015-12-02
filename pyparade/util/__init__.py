@@ -86,6 +86,14 @@ class ParMap(object):
 
 		self.request_stop.set()
 
+	def job_is_finished(self, job, timeout = 0.0):
+		if "stopped" in job:
+			return True
+		elif job["worker"] != None:
+			return job["worker"]["connection"].poll(timeout)
+		else:
+			return False
+
 	def map(self, iterable):
 		"""Applies the map_func of the ParMap object to all elements in the iterable using parallel worker processes. The result is returned as a generator.
 		An optimal chunksize that is submitted to the workers is calculated dynamically.
@@ -122,25 +130,25 @@ class ParMap(object):
 			#wait as long as all workers are busy
 			while free_workers.empty():
 				minjobid = min(jobs.iterkeys())
-				jobs[minjobid]["worker"]["connection"].poll(1)
-				print("wait as long as all workers are busy")
+				jobs[minjobid]["worker"]["connection"].poll(0.1)
 				for job in jobs.itervalues():
 					if (not "stopped" in job) and job["worker"]["connection"].poll():
 						job.update(job["worker"]["connection"].recv())
 						free_workers.put(job["worker"])
+						job["worker"] = None
 
 			#if job limit reached, wait for leftmost job to finish
 			if len(jobs) >= 10*self.num_workers: #do not start jobs for more than 10*workers batches ahead to save memory
-				while not ("stopped" in jobs[min(jobs.iterkeys())] or jobs[min(jobs.iterkeys())]["worker"]["connection"].poll(0.1)):
-					print("job limit reached, wait for leftmost job to finish")
+				while not (self.job_is_finished(jobs[min(jobs.iterkeys())], timeout = 0.1)):
 					pass
 
 			#yield results while leftmost batch is ready
-			while len(jobs) > 0 and ("stopped" in jobs[min(jobs.iterkeys())] or jobs[min(jobs.iterkeys())]["worker"]["connection"].poll()): 
+			while len(jobs) > 0 and (self.job_is_finished(jobs[min(jobs.iterkeys())])): 
 				minjobid = min(jobs.iterkeys())
-				if jobs[minjobid]["worker"]["connection"].poll():
+				if (not "stopped" in jobs[minjobid]) and jobs[minjobid]["worker"]["connection"].poll(): #FIXME: worker might have new job!!!!
 					jobs[minjobid].update(jobs[minjobid]["worker"]["connection"].recv())
 					free_workers.put(jobs[minjobid]["worker"])
+					jobs[minjobid]["worker"] = None
 
 				#update optimal chunksize based on 10*workers last batch processing times
 				last_processing_times[last_processing_time_pos] = (jobs[minjobid]["stopped"] - jobs[minjobid]["started"])/self._chunksize
@@ -173,13 +181,13 @@ class ParMap(object):
 
 		#wait while all workers busy
 		while free_workers.empty():
-			print("wait while all workers busy (last batch)")
 			minjobid = min(jobs.iterkeys())
 			jobs[minjobid]["worker"]["connection"].poll(1)
 			for job in jobs.itervalues():
 				if (not "stopped" in job) and job["worker"]["connection"].poll():
 					job.update(job["worker"]["connection"].recv())
 					free_workers.put(job["worker"])
+					job["worker"] = None
 
 		#submit last batch
 		if len(batch) > 0:
@@ -194,12 +202,12 @@ class ParMap(object):
 		while len(jobs) > 0:
 			#for job in jobs.itervalues():
 				#print("waiting for " + str(job["worker"]["process"].pid))
-			if ("stopped" in jobs[min(jobs.iterkeys())] or jobs[min(jobs.iterkeys())]["worker"]["connection"].poll(1)):
-				print("wait for all jobs to finish")
+			if (self.job_is_finished(jobs[min(jobs.iterkeys())], timeout = 1.0)):
 				minjobid = min(jobs.iterkeys())
-				if jobs[minjobid]["worker"]["connection"].poll():
+				if (not "stopped" in jobs[minjobid]) and jobs[minjobid]["worker"]["connection"].poll():
 					jobs[minjobid].update(jobs[minjobid]["worker"]["connection"].recv())
 					free_workers.put(jobs[minjobid]["worker"])
+					jobs[minjobid]["worker"] = None
 
 				if "error" in jobs[minjobid]:
 					self.request_stop.set()
