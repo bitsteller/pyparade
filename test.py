@@ -24,8 +24,5 @@ def g(a):
 	time.sleep(0.01)
 	return a + 1
 
-inc = d.map(f)
-inc2 = inc.map(g)
-p = pyparade.ParallelProcess(inc2)
-p.run()
-p.collect()
+inc = d.map(f).map(g).collect()
+print(inc)

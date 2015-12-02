@@ -91,4 +91,3 @@ class TestParMap(unittest.TestCase):
 			self.assertEqual(correct_value, calculated_value)
 		self.assertEqual(len(correct_values), len(calculated_values))
 
-

@@ -1,9 +1,17 @@
 # coding=utf-8
-import Queue, threading, time, sys, datetime, multiprocessing
+import Queue, threading, time, sys, datetime, multiprocessing, signal
 
 import operations
 
 TERMINAL_WIDTH = 80
+
+active_processes = []
+
+def signal_handler(signal, frame):
+	global active_processes
+	for proc in active_processes:
+		print("Aborting " + proc.description + " (can take a minute)...")
+		proc.stop()
 
 class Dataset(operations.Source):
 	def __init__(self, source, length=None):
@@ -105,6 +113,42 @@ class Dataset(operations.Source):
 		op = operations.FoldOperation(self, zero_value, fold_func, context_func = context_func)
 		return Dataset(op)
 
+	def start_process(self, description="Parallel Process", num_workers=multiprocessing.cpu_count()):
+		proc = ParallelProcess(self, description)
+		proc.run(num_workers)
+		return proc
+
+	def collect(self, **args):
+		global active_processes
+
+		old_handler = None
+		proc = None
+		if not self.running.is_set(): #no process running yet, start process
+			proc = self.start_process(*args)
+			active_processes.append(proc)
+			old_handler = signal.signal(signal.SIGINT, signal_handler) #abort on CTRL-C
+
+		if self._stop_requested.is_set():
+			raise RuntimeError("Process was stopped")
+
+		result = []
+		for val in self._get_buffer(size=None).generate():
+			if self._stop_requested.is_set():
+				if old_handler != None:
+					signal.signal(signal.SIGINT, old_handler)
+				if proc in active_processes:
+					active_processes.remove(proc)
+				raise RuntimeError("Process was stopped")
+
+			result.append(val)
+
+		if old_handler != None:
+			signal.signal(signal.SIGINT, old_handler)
+		if proc in active_processes:
+			active_processes.remove(proc)
+
+		return result
+
 class Buffer(object):
 	def __init__(self, source, size):
 		super(Buffer, self).__init__()
@@ -139,11 +183,10 @@ class Buffer(object):
 				pass
 
 class ParallelProcess(object):
-	def __init__(self, dataset, title="Parallel process"):
+	def __init__(self, dataset, description="Parallel process"):
 		self.dataset = dataset
 		self.result = []
-		self.buffer = self.dataset._get_buffer(size=None)
-		self.title = title
+		self.description = description
 
 	def run(self, num_workers = multiprocessing.cpu_count()):
 		#Build process tree
@@ -155,7 +198,6 @@ class ParallelProcess(object):
 		for operation in [block for block in chain if isinstance(block, operations.Operation)]:
 			operation.num_workers = num_workers
 
-		started = time.time()
 		threads = []
 		for dataset in [block for block in chain if isinstance(block,Dataset)]:
 			t = threading.Thread(target = dataset._fill_buffers, name="Buffer")
@@ -164,11 +206,6 @@ class ParallelProcess(object):
 
 		ts = threading.Thread(target = self.print_status)
 		ts.start()
-		while ts.is_alive():
-			ts.join(1)
-
-		ended = time.time()
-		print("Computation took " + str(ended-started) + "s.")
 
 	def stop(self):
 		[s.stop() for s in self.chain]
@@ -180,6 +217,8 @@ class ParallelProcess(object):
 		sys.stdout.flush()
 
 	def print_status(self):
+		started = time.time()
+
 		self.clear_screen()
 		print(self.get_status())
 		t = 0
@@ -197,8 +236,11 @@ class ParallelProcess(object):
 		self.clear_screen()
 		print(self.get_status())
 
+		ended = time.time()
+		print("Computation took " + str(ended-started) + "s.")
+
 	def get_status(self):
-		txt = self.title + "\n"
+		txt = self.description + "\n"
 		txt += ("=" * TERMINAL_WIDTH) + "\n"
 		txt += "\n".join([self.get_buffer_status(op) + "\n" + self.get_operation_status(op) for op in self.chain if isinstance(op, operations.Operation)])
 		txt += "\n" + self.get_result_status()
@@ -233,7 +275,7 @@ class ParallelProcess(object):
 				status += str(op.processed) + "/" + str(len(op.source))
 		else:
 			if not op.running.is_set():
-				status += "stopped"	
+				status += "stopped"
 
 		space = " "*(TERMINAL_WIDTH - len(str(op)) - len(status) - 1)
 		return " " + str(op) + space + status
@@ -245,20 +287,4 @@ class ParallelProcess(object):
 
 		title = "Dataset (result)"
 		space = " "*(TERMINAL_WIDTH - len(title) - len(status))
-		return title + space + status		
-
-	def collect(self):
-		#if self.dataset._stop_requested.is_set():
-		#	raise RuntimeError("Process was stopped")
-		#if not self.dataset.finished.is_set():
-		#	raise RuntimeError("Process is not finished")
-
-		result = []
-		for val in self.buffer.generate():
-			if self.dataset._stop_requested.is_set():
-				raise RuntimeError("Process was stopped")
-			result.append(val)
-		#print(result)
-		return result
-			#time.sleep(1)
-		#return self.buffer.generate()
+		return title + space + status
