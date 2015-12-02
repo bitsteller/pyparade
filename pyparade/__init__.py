@@ -121,7 +121,11 @@ class Dataset(operations.Source):
 	def _stop_process(self, process, old_handler):
 		global active_processes
 
-		signal.signal(signal.SIGINT, old_handler)
+		if old_handler != None:
+			signal.signal(signal.SIGINT, old_handler)
+		else:
+			signal.signal(signal.SIGINT, signal.SIG_DFL)
+
 		if process in active_processes:
 			active_processes.remove(process)
 
@@ -160,7 +164,11 @@ class Dataset(operations.Source):
 		if self._stop_requested.is_set():
 			self._stop_process(proc, old_handler)
 
-		signal.signal(signal.SIGINT, old_handler)
+		if old_handler != None:
+			signal.signal(signal.SIGINT, old_handler)
+		else:
+			signal.signal(signal.SIGINT, signal.SIG_DFL)
+		
 		if proc in active_processes:
 			active_processes.remove(proc)
 
