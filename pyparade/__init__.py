@@ -1,5 +1,5 @@
 # coding=utf-8
-import Queue, threading, time, sys, datetime, multiprocessing, signal
+import Queue, threading, time, sys, datetime, multiprocessing, signal, threading
 
 import operations
 
@@ -118,6 +118,22 @@ class Dataset(operations.Source):
 		proc.run(num_workers)
 		return proc
 
+	def _stop_process(self, process, old_handler):
+		global active_processes
+
+		if old_handler != None:
+			signal.signal(signal.SIGINT, old_handler)
+		if process in active_processes:
+			active_processes.remove(process)
+
+		while threading.active_count() > 1:
+			print("Hanging threads:")
+			for t in threading.enumerate():
+				if t.isAlive() and not(t == threading.current_thread()):
+					print(t.name)
+			time.sleep(5)
+		raise RuntimeError("Process was stopped")
+
 	def collect(self, **args):
 		global active_processes
 
@@ -129,18 +145,17 @@ class Dataset(operations.Source):
 			old_handler = signal.signal(signal.SIGINT, signal_handler) #abort on CTRL-C
 
 		if self._stop_requested.is_set():
-			raise RuntimeError("Process was stopped")
+			self._stop_process(proc, old_handler)
 
 		result = []
 		for val in self._get_buffer(size=None).generate():
 			if self._stop_requested.is_set():
-				if old_handler != None:
-					signal.signal(signal.SIGINT, old_handler)
-				if proc in active_processes:
-					active_processes.remove(proc)
-				raise RuntimeError("Process was stopped")
+				self._stop_process(proc, old_handler)
 
 			result.append(val)
+
+		if self._stop_requested.is_set():
+			self._stop_process(proc, old_handler)
 
 		if old_handler != None:
 			signal.signal(signal.SIGINT, old_handler)
