@@ -211,6 +211,7 @@ class ReduceByKeyOperation(Operation):
 	"""docstring for GroupByKeyOperation"""
 	def __init__(self, source, reduce_func, num_workers=multiprocessing.cpu_count()):
 		super(ReduceByKeyOperation, self).__init__(source, num_workers)
+		self.reduce_func = reduce_func
 
 	def __str__(self):
 		return "ReduceByKey"
