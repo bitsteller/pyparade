@@ -147,7 +147,7 @@ class FlatMapOperation(MapOperation):
 				self._output(r)
 		
 class GroupByKeyOperation(Operation):
-	"""docstring for GroupByKeyOperation"""
+	"""Groups the key/value pairs and yields tuples (key, [list of values])"""
 	def __init__(self, source, partly = False, num_workers=multiprocessing.cpu_count()):
 		super(GroupByKeyOperation, self).__init__(source, num_workers)
 		self.partly = partly
@@ -208,7 +208,7 @@ class GroupByKeyOperation(Operation):
 				self._output((k,v))
 
 class ReduceByKeyOperation(Operation):
-	"""docstring for GroupByKeyOperation"""
+	"""Reduces the dataset by grouping the key/value pairs by key and applying the reduce_func to the values of each group"""
 	def __init__(self, source, reduce_func, num_workers=multiprocessing.cpu_count()):
 		super(ReduceByKeyOperation, self).__init__(source, num_workers)
 		self.reduce_func = reduce_func
