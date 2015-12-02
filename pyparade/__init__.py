@@ -121,10 +121,12 @@ class Dataset(operations.Source):
 	def _stop_process(self, process, old_handler):
 		global active_processes
 
-		if old_handler != None:
-			signal.signal(signal.SIGINT, old_handler)
+		signal.signal(signal.SIGINT, old_handler)
 		if process in active_processes:
 			active_processes.remove(process)
+
+		if threading.active_count() > 1:
+			time.sleep(2)
 
 		while threading.active_count() > 1:
 			print("Hanging threads:")
@@ -142,7 +144,8 @@ class Dataset(operations.Source):
 		if not self.running.is_set(): #no process running yet, start process
 			proc = self.start_process(*args)
 			active_processes.append(proc)
-			old_handler = signal.signal(signal.SIGINT, signal_handler) #abort on CTRL-C
+			old_handler = signal.getsignal(signal.SIGINT)
+			signal.signal(signal.SIGINT, signal_handler) #abort on CTRL-C
 
 		if self._stop_requested.is_set():
 			self._stop_process(proc, old_handler)
@@ -157,8 +160,7 @@ class Dataset(operations.Source):
 		if self._stop_requested.is_set():
 			self._stop_process(proc, old_handler)
 
-		if old_handler != None:
-			signal.signal(signal.SIGINT, old_handler)
+		signal.signal(signal.SIGINT, old_handler)
 		if proc in active_processes:
 			active_processes.remove(proc)
 

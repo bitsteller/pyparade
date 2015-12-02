@@ -2,16 +2,6 @@ import time, signal
 
 import pyparade
 
-p = None
-
-def signal_handler(signal, frame):
-	global p
-	if p:
-		p.stop()
-
-if __name__ == '__main__':
-	signal.signal(signal.SIGINT, signal_handler) #abort on CTRL-C
-
 d = pyparade.Dataset(range(0,1000000))
 
 def f(a):
