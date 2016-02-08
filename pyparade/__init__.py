@@ -146,7 +146,7 @@ class Dataset(operations.Source):
 		old_handler = None
 		proc = None
 		if not self.running.is_set(): #no process running yet, start process
-			proc = self.start_process(*args)
+			proc = self.start_process(**args)
 			active_processes.append(proc)
 			old_handler = signal.getsignal(signal.SIGINT)
 			signal.signal(signal.SIGINT, signal_handler) #abort on CTRL-C
