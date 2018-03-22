@@ -10,12 +10,12 @@ active_processes = []
 def signal_handler(signal, frame):
 	global active_processes
 	for proc in active_processes:
-		print("Aborting " + proc.description + " (can take a minute)...")
+		print("Aborting " + proc.name + " (can take a minute)...")
 		proc.stop()
 
 class Dataset(operations.Source):
-	def __init__(self, source, length=None):
-		super(Dataset, self).__init__()
+	def __init__(self, source, length=None, name=None):
+		super(Dataset, self).__init__(name)
 
 		self.source = source
 		self._length = length
@@ -29,6 +29,12 @@ class Dataset(operations.Source):
 		else:
 			self._length_is_estimated = True
 
+		if self.name == None:
+			if isinstance(self.source, operations.Source) and self.source.output_name != None: #get name from operation output
+				self.name = self.source.output_name
+			else:
+				self.name = "Dataset" 
+
 		self._buffers = []
 		self.finished = threading.Event()
 
@@ -37,9 +43,6 @@ class Dataset(operations.Source):
 			return self._length
 		else:
 			raise RuntimeError("Length is not available")
-
-	def __str__(self):
-		return "Dataset"
 
 	def _get_buffer(self, size = 30):
 		buf = Buffer(self, size=size)
@@ -93,28 +96,28 @@ class Dataset(operations.Source):
 	def length_is_estimated(self):
 		return self._length_is_estimated
 
-	def map(self, map_func, context_func = None):
-		op = operations.MapOperation(self, map_func, context_func = context_func)
+	def map(self, map_func, context = None, **kwargs):
+		op = operations.MapOperation(self, map_func, context = context, **kwargs)
 		return Dataset(op)
 
-	def flat_map(self, map_func, context_func = None):
-		op = operations.FlatMapOperation(self, map_func, context_func = context_func)
+	def flat_map(self, map_func, context = None, **kwargs):
+		op = operations.FlatMapOperation(self, map_func, context = context, **kwargs)
 		return Dataset(op)
 
-	def group_by_key(self, partly = False):
-		op = operations.GroupByKeyOperation(self, partly = partly)
+	def group_by_key(self, partly = False, **kwargs):
+		op = operations.GroupByKeyOperation(self, partly = partly, **kwargs)
 		return Dataset(op)
 
-	def reduce_by_key(self, reduce_func):
-		op = operations.ReduceByKeyOperation(self, reduce_func)
+	def reduce_by_key(self, reduce_func, **kwargs):
+		op = operations.ReduceByKeyOperation(self, reduce_func, **kwargs)
 		return Dataset(op)
 
-	def fold(self, zero_value, fold_func, context_func = None):
-		op = operations.FoldOperation(self, zero_value, fold_func, context_func = context_func)
+	def fold(self, zero_value, fold_func, context = None, **kwargs):
+		op = operations.FoldOperation(self, zero_value, fold_func, context = context, **kwargs)
 		return Dataset(op)
 
-	def start_process(self, description="Parallel Process", num_workers=multiprocessing.cpu_count()):
-		proc = ParallelProcess(self, description)
+	def start_process(self, name="Parallel Process", num_workers=multiprocessing.cpu_count()):
+		proc = ParallelProcess(self, name)
 		proc.run(num_workers)
 		return proc
 
@@ -208,10 +211,10 @@ class Buffer(object):
 				pass
 
 class ParallelProcess(object):
-	def __init__(self, dataset, description="Parallel process"):
+	def __init__(self, dataset, name="Parallel process"):
 		self.dataset = dataset
 		self.result = []
-		self.description = description
+		self.name = name
 
 	def run(self, num_workers = multiprocessing.cpu_count()):
 		#Build process tree
@@ -265,7 +268,7 @@ class ParallelProcess(object):
 		print("Computation took " + str(ended-started) + "s.")
 
 	def get_status(self):
-		txt = self.description + "\n"
+		txt = self.name + "\n"
 		txt += ("=" * TERMINAL_WIDTH) + "\n"
 		txt += "\n".join([self.get_buffer_status(op) + "\n" + self.get_operation_status(op) for op in self.chain if isinstance(op, operations.Operation)])
 		txt += "\n" + self.get_result_status()
@@ -279,7 +282,7 @@ class ParallelProcess(object):
 		elif not op.source.running.is_set():
 			status += "stopped"
 
-		title = "Dataset (buffer: " + str(len(op.inbuffer)) + ")"
+		title = op.source.name + " " + "(buffer: " + str(len(op.inbuffer)) + ")"
 		space = " "*(TERMINAL_WIDTH - len(title) - len(status))
 		return title + space + status
 
@@ -310,6 +313,6 @@ class ParallelProcess(object):
 		if self.dataset.has_length():
 			status = str(len(self.dataset))
 
-		title = "Dataset (result)"
+		title = self.dataset.name + " (result)"
 		space = " "*(TERMINAL_WIDTH - len(title) - len(status))
 		return title + space + status

@@ -4,11 +4,13 @@ from pyparade.util import ParMap
 from pyparade.util.btree import BTree
 
 class Source(object):
-	def __init__(self):
+	def __init__(self, name="Source", output_name=None):
 		super(Source, self).__init__()
 		self._stop_requested = threading.Event()
 		self.running = threading.Event()
 		self.finished = threading.Event()
+		self.name = name
+		self.output_name = output_name
 
 	def get_parents(self):
 		parents = [self]
@@ -22,16 +24,18 @@ class Source(object):
 			self.running.clear()
 			return True
 		else:
-			#print(str(self.id) + "no stop")
 			return False
 
 	def stop(self):
 		if self.running.is_set():
 			self._stop_requested.set()
 
+	def __str__(self):
+		return self.name
+
 class Operation(Source):
-	def __init__(self, source, num_workers=multiprocessing.cpu_count(), context_func = None):
-		super(Operation, self).__init__()
+	def __init__(self, source, num_workers=multiprocessing.cpu_count(), context = None, **kwargs):
+		super(Operation, self).__init__(**kwargs)
 		self.source = source
 		self.inbuffer = source._get_buffer()
 		self._outbuffer = Queue.Queue(10)
@@ -41,7 +45,7 @@ class Operation(Source):
 		self.time_started = None
 		self.time_finished = None
 		self.num_workers = num_workers
-		self.context_func = context_func
+		self.context = context
 
 	def __call__(self):
 		self.running.set()
@@ -104,16 +108,13 @@ class Operation(Source):
 
 
 class MapOperation(Operation):
-	def __init__(self, source, map_func, num_workers=multiprocessing.cpu_count(), context_func = None):
-		super(MapOperation, self).__init__(source, num_workers, context_func)
+	def __init__(self, source, map_func, num_workers = multiprocessing.cpu_count(), context = None, name = "Map", **kwargs):
+		super(MapOperation, self).__init__(source, num_workers, context, name = name, **kwargs)
 		self.map_func = map_func
 		self.pool = None #multiprocessing.Pool(num_workers, maxtasksperchild = 1000, initializer = initializer)
 
-	def __str__(self):
-		return "Map"
-
 	def run(self):
-		self.pool = ParMap(self.map_func, num_workers = self.num_workers, context_func = self.context_func)
+		self.pool = ParMap(self.map_func, num_workers = self.num_workers, context_func = self.context)
 		#map
 		result = []
 		for response in self.pool.map(self._generate_input()):
@@ -126,14 +127,11 @@ class MapOperation(Operation):
 
 class FlatMapOperation(MapOperation):
 	"""Calls the map function for every value in the dataset and then flattens the result"""
-	def __init__(self, source, map_func, num_workers=multiprocessing.cpu_count(), context_func = None):
-		super(FlatMapOperation, self).__init__(source, map_func, num_workers, context_func)
-
-	def __str__(self):
-		return "FlatMap"
+	def __init__(self, source, map_func, num_workers=multiprocessing.cpu_count(), context = None, name = "FlatMap", **kwargs):
+		super(FlatMapOperation, self).__init__(source, map_func, num_workers, context, name = name, **kwargs)
 
 	def run(self):
-		self.pool = ParMap(self.map_func, num_workers = self.num_workers, context_func = self.context_func)
+		self.pool = ParMap(self.map_func, num_workers = self.num_workers, context_func = self.context)
 		#map
 		result = []
 		for response in self.pool.map(self._generate_input()):
@@ -148,12 +146,9 @@ class FlatMapOperation(MapOperation):
 		
 class GroupByKeyOperation(Operation):
 	"""Groups the key/value pairs and yields tuples (key, [list of values])"""
-	def __init__(self, source, partly = False, num_workers=multiprocessing.cpu_count()):
-		super(GroupByKeyOperation, self).__init__(source, num_workers)
+	def __init__(self, source, partly = False, num_workers=multiprocessing.cpu_count(), name = "GroupByKey", **kwargs):
+		super(GroupByKeyOperation, self).__init__(source, num_workers, name = name, **kwargs)
 		self.partly = partly
-
-	def __str__(self):
-		return "GroupByKey"
 
 	def run_partly(self, chunksize):
 		tree = BTree(chunksize, None, None)
@@ -209,12 +204,9 @@ class GroupByKeyOperation(Operation):
 
 class ReduceByKeyOperation(Operation):
 	"""Reduces the dataset by grouping the key/value pairs by key and applying the reduce_func to the values of each group"""
-	def __init__(self, source, reduce_func, num_workers=multiprocessing.cpu_count()):
-		super(ReduceByKeyOperation, self).__init__(source, num_workers)
+	def __init__(self, source, reduce_func, num_workers=multiprocessing.cpu_count(), name = "ReduceByKey", **kwargs):
+		super(ReduceByKeyOperation, self).__init__(source, num_workers, name = name, **kwargs)
 		self.reduce_func = reduce_func
-
-	def __str__(self):
-		return "ReduceByKey"
 
 	def run(self, chunksize=10):
 		tree = BTree(chunksize, None, None)
@@ -236,14 +228,11 @@ class ReduceByKeyOperation(Operation):
 
 class FoldOperation(Operation):
 	"""Folds the dataset using a combine function"""
-	def __init__(self, source, zero_value, fold_func, num_workers=multiprocessing.cpu_count(), context_func = None):
-		super(FoldOperation, self).__init__(source, num_workers, context_func)
+	def __init__(self, source, zero_value, fold_func, num_workers=multiprocessing.cpu_count(), context = None, name = "Fold", **kwargs):
+		super(FoldOperation, self).__init__(source, num_workers, context, name = name, **kwargs)
 		self.pool = None #ParMap(self._fold_batch, num_workers = num_workers) #futures.ThreadPoolExecutor(num_workers)
 		self.zero_value = zero_value
 		self.fold_func = fold_func
-
-	def __str__(self):
-		return "Fold"
 
 	def _generate_input_batches(self, chunksize):
 		batch = []
@@ -262,7 +251,7 @@ class FoldOperation(Operation):
 		return result
 
 	def run(self, chunksize = 10):
-		self.pool = ParMap(self._fold_batch, num_workers = self.num_workers, context_func = self.context_func)
+		self.pool = ParMap(self._fold_batch, num_workers = self.num_workers, context_func = self.context)
 		result = []
 
 		for response in self.pool.map(self._generate_input_batches(chunksize = chunksize)):
