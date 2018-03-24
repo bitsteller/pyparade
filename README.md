@@ -12,11 +12,23 @@ Similar to [SPARK](https://spark.apache.org) you define how your data should be 
 
 You model how the result is calculated by applying an operation to a dataset. The result is a new dataset that you can apply new opertions on:
 
-	result = dataset.map(f).group_by_key().map(g)
+	dataset = pyprade.Dataset(range(0,1000))
+	result = dataset.map(f).group_by_key().map(g).collect()
 	
 ## Watch the progress
 
 By default pyParade will display detailled status infomation about the running process on console. It will tell you how much data is already processed and will calculate estimated completion times.
+
+	Parallel Process
+	================================================================================
+	Numbers (buffer: 725420)                                                 1000000
+	 calculate                       20.129000%  ETA 2018-03-24 17:55 201290/1000000
+	Key/Value pairs (buffer: 4846)                                                  
+	 take value                                                         71790/137591
+	Values (buffer: 0)                                                              
+	 sum                                                                   748/30831
+	Sum (result)                                                                   0
+
 
 ## Low memory use
 
