@@ -268,7 +268,7 @@ class ParallelProcess(object):
 		print("Computation took " + str(ended-started) + "s.")
 
 	def get_status(self):
-		txt = self.name + "\n"
+		txt = util.shorten(str(self), TERMINAL_WIDTH) + "\n"
 		txt += ("=" * TERMINAL_WIDTH) + "\n"
 		txt += "\n".join([self.get_buffer_status(op) + "\n" + self.get_operation_status(op) for op in self.chain if isinstance(op, operations.Operation)])
 		txt += "\n" + self.get_result_status()
@@ -282,7 +282,10 @@ class ParallelProcess(object):
 		elif not op.source.running.is_set():
 			status += "stopped"
 
-		title = op.source.name + " " + "(buffer: " + str(len(op.inbuffer)) + ")"
+		title = "" 
+		if len(op.inbuffer) > 0:
+			title += " " + "(buffer: " + str(len(op.inbuffer)) + ")"
+		title = util.shorten(str(op.source), TERMINAL_WIDTH - len(title) - len(status)) + title
 		space = " "*(TERMINAL_WIDTH - len(title) - len(status))
 		return title + space + status
 
@@ -305,14 +308,19 @@ class ParallelProcess(object):
 			if not op.running.is_set():
 				status += "stopped"
 
-		space = " "*(TERMINAL_WIDTH - len(str(op)) - len(status) - 1)
-		return " " + str(op) + space + status
+		title = util.shorten(str(op), (TERMINAL_WIDTH - len(str(op)) - len(status) - 2))
+		space = " "*(TERMINAL_WIDTH - len(str(title)) - len(status) - 1)
+		return " " + title + space + status
 
 	def get_result_status(self):
 		status = ""
 		if self.dataset.has_length():
 			status = str(len(self.dataset))
 
-		title = self.dataset.name + " (result)"
+		title = " (result)"
+		title = util.shorten(str(self.dataset), TERMINAL_WIDTH - len(title) - len(status)) + title
 		space = " "*(TERMINAL_WIDTH - len(title) - len(status))
 		return title + space + status
+
+	def __str__(self):
+		return self.name

@@ -10,6 +10,23 @@ def sstr(obj):
 	except UnicodeEncodeError:
 		return unicode(obj).encode('utf-8')
 
+def shorten(text, max_length=140):
+	min_length = 0.8*max_length
+	shortstr = ""
+
+	if len(text) <= max_length:
+		return text
+
+	words = text.split(" ")
+	for word in words:
+		if len(shortstr) < min_length:
+			if len(shortstr) + len(word) + len(" ") <= max_length:
+				shortstr += word + " "
+			else:
+				shortstr = text[0:max_length-2] + " "
+	return shortstr[:-1] + "..."
+
+
 class Event(object):
 	"""An event that can have multiple handlers """
 	def __init__(self):
