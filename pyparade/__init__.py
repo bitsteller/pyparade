@@ -1,7 +1,12 @@
 # coding=utf-8
 from __future__ import print_function
 from __future__ import absolute_import
-import Queue, threading, time, sys, datetime, multiprocessing, signal, threading
+from __future__ import division
+from future import standard_library
+standard_library.install_aliases()
+from builtins import str
+from builtins import object
+import queue, threading, time, sys, datetime, multiprocessing, signal, threading
 
 from . import operations
 
@@ -160,7 +165,7 @@ class Dataset(operations.Source):
 			self._stop_process(proc, old_handler)
 
 		result = []
-		for val in self._get_buffer(size=None).generate():
+		for val in self._get_buffer().generate():
 			if self._stop_requested.is_set():
 				self._stop_process(proc, old_handler)
 
@@ -184,7 +189,7 @@ class Buffer(object):
 		super(Buffer, self).__init__()
 		self.source = source
 		self.size = size
-		self.queue = Queue.Queue(size)
+		self.queue = queue.Queue(size)
 		self._length = 0
 		self._length_lock = threading.Lock()
 

@@ -1,4 +1,5 @@
 from __future__ import print_function
+from builtins import range
 import time, signal, random, operator
 
 import pyparade
@@ -15,7 +16,7 @@ def g(kv):
 	k,v = kv
 	return v
 
-result = pyparade.Dataset(range(0,1000000), name="Numbers") \
+result = pyparade.Dataset(list(range(0,1000000)), name="Numbers") \
 			.map(f, name="calculate", output_name="Key/Value pairs") \
 		 	.map(g, name="take value", output_name="Values") \
 		 	.fold(0,operator.add,name="sum", output_name="Sum").collect()

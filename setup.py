@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 import sys, os
 
-version = '0.3.2.dev0'
+version = '0.4.0.dev0'
 
 setup(name='pyparade',
       version=version,
@@ -25,6 +25,6 @@ PyParade is a lightweight multiprocessing framework that makes it easy to parall
       include_package_data=True,
       zip_safe=True,
       install_requires=[
-
+            'future>=0.18.2'
       ]
       )

@@ -1,9 +1,10 @@
 from __future__ import print_function
+from builtins import range
 import time
 
 import pyparade
 
-d = pyparade.Dataset(range(0,1000000), name="Numbers with a really extremly unnecessarly long dataset name for no reason")
+d = pyparade.Dataset(list(range(0,1000000)), name="Numbers with a really extremly unnecessarly long dataset name for no reason")
 
 def f(a):
 	#print(str(a) + "->" + str(a+1))

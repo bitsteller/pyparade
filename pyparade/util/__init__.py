@@ -1,5 +1,12 @@
 # coding=utf8
-import multiprocessing, time, math, traceback, Queue
+from __future__ import print_function
+from __future__ import division
+from future import standard_library
+standard_library.install_aliases()
+from builtins import str
+from builtins import range
+from builtins import object
+import multiprocessing, time, math, traceback, queue
 from multiprocessing import Process
 import multiprocessing
 
@@ -8,7 +15,7 @@ def sstr(obj):
 	try:
 		return str(obj)
 	except UnicodeEncodeError:
-		return unicode(obj).encode('utf-8')
+		return str(obj).encode('utf-8')
 
 def shorten(text, max_length=140):
 	min_length = 0.8*max_length
@@ -122,7 +129,7 @@ class ParMap(object):
 		"""
 		#initialize
 		workers = []
-		free_workers = Queue.Queue()
+		free_workers = queue.Queue()
 		self.request_stop = multiprocessing.Event()
 		self._chunksize = 1
 
@@ -146,9 +153,9 @@ class ParMap(object):
 		for value in iterable:
 			#wait as long as all workers are busy
 			while free_workers.empty():
-				minjobid = min(jobs.iterkeys())
+				minjobid = min(jobs.keys())
 				jobs[minjobid]["worker"]["connection"].poll(0.1)
-				for job in jobs.itervalues():
+				for job in jobs.values():
 					if (not "stopped" in job) and job["worker"]["connection"].poll():
 						job.update(job["worker"]["connection"].recv())
 						free_workers.put(job["worker"])
@@ -156,12 +163,12 @@ class ParMap(object):
 
 			#if job limit reached, wait for leftmost job to finish
 			if len(jobs) >= 10*self.num_workers: #do not start jobs for more than 10*workers batches ahead to save memory
-				while not (self.job_is_finished(jobs[min(jobs.iterkeys())], timeout = 0.1)):
+				while not (self.job_is_finished(jobs[min(jobs.keys())], timeout = 0.1)):
 					pass
 
 			#yield results while leftmost batch is ready
-			while len(jobs) > 0 and (self.job_is_finished(jobs[min(jobs.iterkeys())])): 
-				minjobid = min(jobs.iterkeys())
+			while len(jobs) > 0 and (self.job_is_finished(jobs[min(jobs.keys())])): 
+				minjobid = min(jobs.keys())
 				if (not "stopped" in jobs[minjobid]) and jobs[minjobid]["worker"]["connection"].poll(): #FIXME: worker might have new job!!!!
 					jobs[minjobid].update(jobs[minjobid]["worker"]["connection"].recv())
 					free_workers.put(jobs[minjobid]["worker"])
@@ -198,9 +205,9 @@ class ParMap(object):
 
 		#wait while all workers busy
 		while free_workers.empty():
-			minjobid = min(jobs.iterkeys())
+			minjobid = min(jobs.keys())
 			jobs[minjobid]["worker"]["connection"].poll(1)
-			for job in jobs.itervalues():
+			for job in jobs.values():
 				if (not "stopped" in job) and job["worker"]["connection"].poll():
 					job.update(job["worker"]["connection"].recv())
 					free_workers.put(job["worker"])
@@ -219,8 +226,8 @@ class ParMap(object):
 		while len(jobs) > 0:
 			#for job in jobs.itervalues():
 				#print("waiting for " + str(job["worker"]["process"].pid))
-			if (self.job_is_finished(jobs[min(jobs.iterkeys())], timeout = 1.0)):
-				minjobid = min(jobs.iterkeys())
+			if (self.job_is_finished(jobs[min(jobs.keys())], timeout = 1.0)):
+				minjobid = min(jobs.keys())
 				if (not "stopped" in jobs[minjobid]) and jobs[minjobid]["worker"]["connection"].poll():
 					jobs[minjobid].update(jobs[minjobid]["worker"]["connection"].recv())
 					free_workers.put(jobs[minjobid]["worker"])
@@ -233,7 +240,7 @@ class ParMap(object):
 						try:
 							worker["connection"].close()
 							worker["process"].join()
-						except Exception, e:
+						except Exception as e:
 							pass
 					raise jobs[minjobid]["error"]
 
@@ -247,7 +254,7 @@ class ParMap(object):
 				worker["connection"].send(None) #send shutdown command
 				worker["connection"].close()
 				worker["process"].join()
-			except Exception, e:
+			except Exception as e:
 				pass
 
 	def _work(self, conn, context_func):
@@ -258,7 +265,7 @@ class ParMap(object):
 					while batch != None and not self.request_stop.is_set():
 						self._map_batch(conn, batch, c)
 						batch = conn.recv()
-			except Exception, e: #worker not initialized, return error for all incoming jobs
+			except Exception as e: #worker not initialized, return error for all incoming jobs
 				batch = conn.recv()
 				while batch != None and not self.request_stop.is_set():
 					jobinfo = {}
@@ -278,7 +285,7 @@ class ParMap(object):
 		for value in batch:
 			if self.request_stop.is_set():
 				jobinfo = {}
-				jobinfo["error"] = StandardError("stop requested")
+				jobinfo["error"] = Exception("stop requested")
 				jobinfo["stopped"] = time.time()
 				conn.send(jobinfo)
 				return
@@ -287,7 +294,7 @@ class ParMap(object):
 					results.append(self.map_func(value, context))
 				else:
 					results.append(self.map_func(value))
-			except Exception, e:
+			except Exception as e:
 				traceback.print_stack()
 				print(e)
 				jobinfo = {}

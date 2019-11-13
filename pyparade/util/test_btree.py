@@ -1,6 +1,13 @@
+from past.builtins import cmp
+from builtins import str
+from builtins import range
+from builtins import object
+from functools import total_ordering
+
 import os, random, tempfile, shutil
 import unittest
 import pkg_resources
+
 
 from pyparade.util.btree import BTree, BTreeFileLeafFactory
 
@@ -67,7 +74,7 @@ class TestBTree(unittest.TestCase):
 		self.assertEqual([], self.btree.root.childs[0].keys)
 		self.assertEqual([], self.btree.root.childs[0].values)
 
-
+@total_ordering
 class IntClass(object):
 	def __init__(self, integer):
 		self.integer = integer
@@ -82,15 +89,11 @@ class IntClass(object):
 	def __str__(self):
 		return str(self.integer)
 
-	def __cmp__(self, other):
-		return cmp(self.integer,other.integer)
+	def __lt__(self, other):
+		return self.integer < other.integer
 
 	def __eq__(self, other):
-		return (isinstance(other, self.__class__)
-			and self.__cmp__(other) == 0)
-
-	def __ne__(self, other):
-		return not self.__eq__(other)
+		return (isinstance(other, self.__class__)) and (self.integer == other.integer)
 
 class TestBTreeFileLeaves(unittest.TestCase):
 	def setUp(self):

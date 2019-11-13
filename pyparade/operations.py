@@ -1,4 +1,9 @@
-import threading, multiprocessing, Queue, time, collections
+from future import standard_library
+standard_library.install_aliases()
+from builtins import str
+from builtins import zip
+from builtins import object
+import threading, multiprocessing, queue, time, collections
 
 from pyparade.util import ParMap
 from pyparade.util.btree import BTree
@@ -38,7 +43,7 @@ class Operation(Source):
 		super(Operation, self).__init__(**kwargs)
 		self.source = source
 		self.inbuffer = source._get_buffer()
-		self._outbuffer = Queue.Queue(10)
+		self._outbuffer = queue.Queue(10)
 		self._last_output = time.time()
 		self._outbatch = []
 		self.processed = 0

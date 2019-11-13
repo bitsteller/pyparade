@@ -1,15 +1,18 @@
+from builtins import zip
+from builtins import str
+from builtins import range
+from builtins import object
 import os, json, hashlib
 from abc import ABCMeta, abstractmethod
 
 from pyparade.util import sstr, Event
+from future.utils import with_metaclass
 
 #--------------------
 #B+ Tree implemention
 #--------------------
 
-class BTreeNode(object):
-	__metaclass__ = ABCMeta
-
+class BTreeNode(with_metaclass(ABCMeta, object)):
 	def __init__(self, parent):
 		self.parent = parent
 
@@ -107,7 +110,7 @@ class BTreeMemoryLeafNode(BTreeLeafNode):
 	def __setitem__(self, key, value):
 		try:
 			self.remove(key)
-		except Exception, e:
+		except Exception as e:
 			pass
 		self.insert(key, value)
 
@@ -122,12 +125,12 @@ class BTreeMemoryLeafNode(BTreeLeafNode):
 
 	def to_JSON(self):
 		leafjson = {}
-		if parent.key_class in [int, dict, list, str, unicode]:
+		if parent.key_class in [int, dict, list, str, str]:
 			leafjson["keys"] = self.keys
 		else:
 			leafjson["keys"] = [key.to_JSON() for key in self.keys]
 
-		if parent.value_class in [int, dict, list, str, unicode]:
+		if parent.value_class in [int, dict, list, str, str]:
 			leafjson["values"] = self.values
 		else:
 			leafjson["values"] = [value.to_JSON() for value in self.values]
@@ -137,12 +140,12 @@ class BTreeMemoryLeafNode(BTreeLeafNode):
 	@staticmethod
 	def from_JSON(parent, nodejson):
 		node = BTreeMemoryLeafNode(parent)
-		if parent.key_class in [int, dict, list, str, unicode]:
+		if parent.key_class in [int, dict, list, str, str]:
 			node.keys = nodejson["keys"]
 		else:
 			node.keys = [parent.key_class.from_JSON(keyjson) for keyjson in nodejson["keys"]]
 
-		if parent.value_class in [int, dict, list, str, unicode]:
+		if parent.value_class in [int, dict, list, str, str]:
 			node.values = nodejson["values"]
 		else:
 			node.values = [parent.value_class.from_JSON(childjson) for childjson in nodejson["values"]]
@@ -210,7 +213,7 @@ class BTreeMemoryLeafNode(BTreeLeafNode):
 				self.parent.remove(self)
 
 	def borrowLeft(self, key, leaf):
-		pairs = zip(leaf.keys, leaf.values)
+		pairs = list(zip(leaf.keys, leaf.values))
 		pairs.reverse() #to pop left first
 		oldseperator = key
 		newseperator = key
@@ -224,7 +227,7 @@ class BTreeMemoryLeafNode(BTreeLeafNode):
 		leaf.parent.replaceKey(oldseperator,newseperator)
 
 	def borrowRight(self, key, leaf):
-		pairs = zip(leaf.keys, leaf.values)
+		pairs = list(zip(leaf.keys, leaf.values))
 		oldseperator = key
 		newseperator = key
 		while not(len(self) >= self.page_size // 2) or len(self) < len(leaf)-1:
@@ -352,7 +355,7 @@ class BTreeFileLeafNode(BTreeMemoryLeafNode):
 	def __setitem__(self, key, value):
 		try:
 			self.remove(key)
-		except Exception, e:
+		except Exception as e:
 			pass
 		self.insert(key, value)
 
@@ -367,12 +370,12 @@ class BTreeFileLeafNode(BTreeMemoryLeafNode):
 				if leafjson["version"] != 1:
 					raise IOException("Version of B+ tree page file " + sstr(self.filename) + " is not compatible.")
 
-				if self.key_class in [int, dict, list, str, unicode]:
+				if self.key_class in [int, dict, list, str, str]:
 					self.keys = leafjson["keys"]
 				else:
 					self.keys = [self.key_class.from_JSON(keyjson) for keyjson in leafjson["keys"]]
 
-				if self.value_class in [int, dict, list, str, unicode]:
+				if self.value_class in [int, dict, list, str, str]:
 					self.values = leafjson["values"]
 				else:
 					self.values = [self.value_class.from_JSON(value_json) for value_json in leafjson["values"]]
@@ -389,12 +392,12 @@ class BTreeFileLeafNode(BTreeMemoryLeafNode):
 			leafjson = {}
 			leafjson["version"] = 1
 			if len(self) > 0:
-				if self.key_class in [int, dict, list, str, unicode]:
+				if self.key_class in [int, dict, list, str, str]:
 					leafjson["keys"] = self.keys
 				else:
 					leafjson["keys"] = [key.to_JSON() for key in self.keys]
 
-				if self.value_class in [int, dict, list, str, unicode]:
+				if self.value_class in [int, dict, list, str, str]:
 					leafjson["values"] = self.values
 				else:
 					leafjson["values"] = [value.to_JSON() for value in self.values]
@@ -403,7 +406,7 @@ class BTreeFileLeafNode(BTreeMemoryLeafNode):
 				leafjson["values"] = []
 
 			s = json.dumps(leafjson, indent=3)
-			self.hash = sstr(hashlib.md5(s).hexdigest())
+			self.hash = sstr(hashlib.md5(s.encode('utf-8')).hexdigest())
 			f = open(self.filename, 'w')
 			f.write(s + "\n")
 			f.close()
@@ -572,7 +575,7 @@ class BTreeInteriorNode(BTreeNode):
 
 	def to_JSON(self):
 		nodejson = {}
-		if self.key_class in [int, dict, list, str, unicode]:
+		if self.key_class in [int, dict, list, str, str]:
 			nodejson["keys"] = self.keys
 		else:
 			nodejson["keys"] = [key.to_JSON() for key in self.keys]
@@ -583,7 +586,7 @@ class BTreeInteriorNode(BTreeNode):
 	@staticmethod
 	def from_JSON(parent, nodejson):
 		node = BTreeInteriorNode(parent)
-		if parent.key_class in [int, dict, list, str, unicode]:
+		if parent.key_class in [int, dict, list, str, str]:
 			node.keys = nodejson["keys"]
 		else:
 			node.keys = [parent.key_class.from_JSON(keyjson) for keyjson in nodejson["keys"]]
@@ -649,7 +652,7 @@ class BTreeInteriorNode(BTreeNode):
 		keys = []
 		keys.extend(node.keys)
 		keys.append(key)
-		pairs = zip(keys, node.childs)
+		pairs = list(zip(keys, node.childs))
 		pairs.reverse()
 		oldseperator = key
 		while not(len(self) >= self.page_size // 2) or len(self) < len(node)-1:
@@ -666,7 +669,7 @@ class BTreeInteriorNode(BTreeNode):
 		keys = []
 		keys.append(key)
 		keys.extend(node.keys)
-		pairs = zip(keys, node.childs)
+		pairs = list(zip(keys, node.childs))
 		oldseperator = key
 		newseperator = key
 		while not(len(self) >= self.page_size // 2) or len(self) < len(node)-1:

@@ -1,3 +1,6 @@
+from builtins import zip
+from builtins import map
+from builtins import range
 import random
 import unittest, time, threading
 
@@ -42,7 +45,7 @@ class TestParMap(unittest.TestCase):
 			return ((a + 1) % 100000, a+1)
 
 		def m():
-			p.map(range(1000000))
+			p.map(list(range(1000000)))
 
 		p = ParMap(f)
 		t = threading.Thread(target=m)
@@ -63,10 +66,10 @@ class TestParMap(unittest.TestCase):
 		t_par = Timer("parmap")
 		#for r in p.map(range(1000000)):
 		#	print(r)
-		calculated_values = [v for v in p.map(range(1000000))]
+		calculated_values = [v for v in p.map(list(range(1000000)))]
 		t_par.stop()
 		t_map = Timer("map")
-		correct_values = map(f,range(1000000))
+		correct_values = list(map(f,list(range(1000000))))
 		t_map.stop()
 		self.assertLessEqual(t_par.seconds, 0.8*t_map.seconds)
 		for calculated_value, correct_value in zip(calculated_values, correct_values):
@@ -82,10 +85,10 @@ class TestParMap(unittest.TestCase):
 
 		p = ParMap(f)
 		t_par = Timer("parmap")
-		calculated_values = [v for v in p.map(range(100000))]
+		calculated_values = [v for v in p.map(list(range(100000)))]
 		t_par.stop()
 		t_map = Timer("map")
-		correct_values = map(f,range(100000))
+		correct_values = list(map(f,list(range(100000))))
 		t_map.stop()
 		for calculated_value, correct_value in zip(calculated_values, correct_values):
 			self.assertEqual(correct_value, calculated_value)

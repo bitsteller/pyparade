@@ -1,8 +1,10 @@
+from __future__ import division
+from builtins import range
 import time, signal, random
 
 import pyparade
 
-d = pyparade.Dataset(range(0,1000000))
+d = pyparade.Dataset(list(range(0,1000000)))
 
 def f(a):
 	#print(str(a) + "->" + str(a+1))
