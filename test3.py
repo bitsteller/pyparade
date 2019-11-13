@@ -1,3 +1,4 @@
+from __future__ import print_function
 import time, signal, random, operator
 
 import pyparade
@@ -19,4 +20,4 @@ result = pyparade.Dataset(range(0,1000000), name="Numbers") \
 		 	.map(g, name="take value", output_name="Values") \
 		 	.fold(0,operator.add,name="sum", output_name="Sum").collect()
 
-print result
+print(result)

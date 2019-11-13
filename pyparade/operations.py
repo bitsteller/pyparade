@@ -60,7 +60,7 @@ class Operation(Source):
 				batch = self._outbuffer.get(True, timeout=1)
 				for value in batch:
 					yield value 
-			except Exception, e:
+			except Exception as e:
 				pass
 
 		self._flush_output()
@@ -72,7 +72,7 @@ class Operation(Source):
 				batch = self._outbuffer.get(True, timeout=1)
 				for value in batch:
 					yield value 
-			except Exception, e:
+			except Exception as e:
 				pass
 
 		self.time_finished = time.time()

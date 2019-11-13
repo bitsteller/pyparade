@@ -1,7 +1,9 @@
 # coding=utf-8
+from __future__ import print_function
+from __future__ import absolute_import
 import Queue, threading, time, sys, datetime, multiprocessing, signal, threading
 
-import operations
+from . import operations
 
 TERMINAL_WIDTH = 80
 
@@ -22,7 +24,7 @@ class Dataset(operations.Source):
 
 		try:
 			self._length = len(source)
-		except Exception, e:
+		except Exception as e:
 			pass
 		if self._length != None:
 			self._length_is_estimated = False
@@ -207,7 +209,7 @@ class Buffer(object):
 					with self._length_lock:
 						self._length -= 1
 					
-			except Exception, e:
+			except Exception as e:
 				pass
 
 class ParallelProcess(object):
@@ -258,7 +260,7 @@ class ParallelProcess(object):
 					self.clear_screen()
 					print(self.get_status())
 					t = 0
-			except Exception, e:
+			except Exception as e:
 				print(e)
 				time.sleep(60)
 		self.clear_screen()
