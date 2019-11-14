@@ -20,8 +20,8 @@ class TestBTree(unittest.TestCase):
 
 	def test_insert(self):
 		self.btree.insert(1,101)
-		self.assertEquals(1, self.btree.root.childs[0].keys[0])
-		self.assertEquals(101, self.btree.root.childs[0].values[0])
+		self.assertEqual(1, self.btree.root.childs[0].keys[0])
+		self.assertEqual(101, self.btree.root.childs[0].values[0])
 
 		self.btree.insert(2,102)
 		self.assertEqual(1, self.btree.root.childs[0].keys[0])

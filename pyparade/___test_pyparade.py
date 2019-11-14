@@ -75,6 +75,6 @@ class TestPyParade(unittest.TestCase):
 					.map(f, name="calculate", output_name="Key/Value pairs") \
 				 	.map(g, name="take value", output_name="Values") \
 				 	.fold(0,operator.add,name="sum", output_name="Sum").collect()
-		self.assertEqual(result[0], sum(range(0,1000000))+1)
+		self.assertEqual(result[0], sum(range(1,1000001)))
 
 
