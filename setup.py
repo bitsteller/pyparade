@@ -15,7 +15,7 @@ PyParade is a lightweight multiprocessing framework that makes it easy to parall
                    "Natural Language :: English",
                    "Operating System :: MacOS :: MacOS X",
                    "Operating System :: POSIX :: Linux",
-                   "Programming Language :: Python :: 2.7"],
+                   "Programming Language :: Python"],
       keywords='big data parallel processing',
       author='Nils Breyer',
       author_email='mail@nilsbreyer.eu',
