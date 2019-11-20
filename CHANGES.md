@@ -2,7 +2,8 @@
 
 ## 0.4.0
 
-* Support for names on all blocks (process, operations, datasets)
+* Support for names on all blocks (process, operations, datasets) using `nameè
+* Possiblity to specify a name for the result dataset of an operation using `output_name`
 * Improved status display
 * Add supoort for Python 3
 
