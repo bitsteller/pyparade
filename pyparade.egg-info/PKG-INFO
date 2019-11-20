@@ -16,4 +16,4 @@ Classifier: Intended Audience :: Information Technology
 Classifier: Natural Language :: English
 Classifier: Operating System :: MacOS :: MacOS X
 Classifier: Operating System :: POSIX :: Linux
-Classifier: Programming Language :: Python :: 2.7
+Classifier: Programming Language :: Python
