@@ -15,13 +15,23 @@ TERMINAL_WIDTH = 80
 active_processes = []
 
 def signal_handler(signal, frame):
+	"""Used internally. Handles interruptions (like pressing CTRL-C) and stops running processes.
+	Args:
+		signal: Signal
+		frame: Stack frame"""
 	global active_processes
 	for proc in active_processes:
 		print("Aborting " + proc.name + " (can take a minute)...")
 		proc.stop()
 
 class Dataset(operations.Source):
+	"""Represents a dataset (can be used as a source, intermediate dataset or result)"""
 	def __init__(self, source, length=None, name=None):
+		"""Creates a new dataset
+		Args:
+			source: A source where the data for this dataset is obtained from. An iterable or `pyparade.operations.Source`
+			length: The number of elements in the dataset. Only used, if len(source) is not available
+			name: The display name for the dataset (convention: 1-25 characters starting with a big letter)"""
 		super(Dataset, self).__init__(name)
 
 		self.source = source
@@ -98,28 +108,82 @@ class Dataset(operations.Source):
 		self.running.clear()
 
 	def has_length(self):
+		"""Returns True if the length of this Source is available. 
+		If this function returns False, calling len() on the Source will raise a RuntimeException."""
 		return self._length != None
 
 	def length_is_estimated(self):
+		"""Returns True if the length of this Source is estimated and might change over time,
+		for example if not all items in the Source are known yet."""
 		return self._length_is_estimated
 
 	def map(self, map_func, context = None, **kwargs):
+		"""Returns a new `pyparade.Dataset` which results from applying map_func to each element in this Dataset.
+
+		Supplying a context can be used to establish a connection to a common resource such as a database.
+
+		Args:
+			map_func: The function to be applied to each element. Has to accept an element from this Dataset as the first 
+					  argument and should return a new element which is put into the output Dataset.
+			context: A function that returns a context manager. It is called once for each parallel executor 
+					 which executes map_func. For each call of map_func the context object is passed as the second argument.
+			**kwargs: Other arguments are passed on to `pyparade.operations.MapOperation
+		"""
 		op = operations.MapOperation(self, map_func, context = context, **kwargs)
 		return Dataset(op)
 
 	def flat_map(self, map_func, context = None, **kwargs):
+		"""Returns a new `pyparade.Dataset` which results from applying map_func to each element in 
+		this Dataset and iterating through the elements returned
+
+		Supplying a context can be used to establish a connection to a common resource such as a database.
+
+		Args:
+			map_func: The function to be applied to each element. Has to accept an element from this Dataset as the first 
+					  argument and should return an iterable containing elements which are put into the output Dataset.
+			context: A function that returns a context manager. It is called once for each parallel executor 
+					 which executes map_func. For each call of map_func the context object is passed as the second argument.
+			**kwargs: Other arguments are passed on to `pyparade.operations.FlatMapOperation
+		"""
 		op = operations.FlatMapOperation(self, map_func, context = context, **kwargs)
 		return Dataset(op)
 
 	def group_by_key(self, partly = False, **kwargs):
+		"""Returns a new `pyparade.Dataset` which results from grouping (key,value) tuples by their key into tuples (key, values).
+
+		Args:
+			partly: If True, partial groups can be returned. This allows streaming processing with output 
+					starting before all elements in the dataset have been processed.
+			**kwargs: Other arguments are passed on to `pyparade.operations.GroupByKeyOperation
+		"""
 		op = operations.GroupByKeyOperation(self, partly = partly, **kwargs)
 		return Dataset(op)
 
 	def reduce_by_key(self, reduce_func, **kwargs):
+		"""Returns a new `pyparade.Dataset` which results from grouping (key,value) tuples by their key into tuples (key, values) 
+		and applying reduce_func to each (key,values) tuple.
+
+		Args:
+			reduce_func: The function to be applied to each (key,values) tuple. Has to accept a (key,values) tuple as the first 
+					  argument and should return a new element which is put into the output Dataset.
+			**kwargs: Other arguments are passed on to `pyparade.operations.ReduceByKeyOperation
+		"""
 		op = operations.ReduceByKeyOperation(self, reduce_func, **kwargs)
 		return Dataset(op)
 
 	def fold(self, zero_value, fold_func, context = None, **kwargs):
+		"""Returns a new `pyparade.Dataset` containing one element which results by repeatedly applying the fold function.
+
+		Supplying a context can be used to establish a connection to a common resource such as a database.
+
+		Args:
+			zero_value: An intial value that represents zero.
+			fold_func: The function to be used to fold two values. Must accept two values as arguments.
+					   Must return a new value that is again accepted as an argument to fold_func.
+			context: A function that returns a context manager. It is called once for each parallel executor 
+					 which executes map_func. For each call of map_func the context object is passed as the second argument.
+			**kwargs: Other arguments are passed on to `pyparade.operations.ReduceByKeyOperation
+		"""
 		op = operations.FoldOperation(self, zero_value, fold_func, context = context, **kwargs)
 		return Dataset(op)
 
@@ -151,6 +215,11 @@ class Dataset(operations.Source):
 		raise RuntimeError("Process was stopped")
 
 	def collect(self, **args):
+		"""Returns a list of all elements in this Source. 
+		Starts a `ParallelProcess` in order to collect the data.
+
+		Args:
+			**args: All arguments are passed on to `pyparade.Dataset.start_process` """
 		global active_processes
 
 		old_handler = None
