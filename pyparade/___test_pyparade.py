@@ -77,4 +77,20 @@ class TestPyParade(unittest.TestCase):
 				 	.fold(0,operator.add,name="sum", output_name="Sum").collect()
 		self.assertEqual(result[0], sum(range(1,1000001)))
 
+	def test_map(self):
+		def slow_generator():
+			for i in xrange(1,100):
+				time.sleep(0.1)
+				yield i
+
+		d = pyparade.Dataset(slow_generator, length=100, name="Slowly generated dataset")
+		
+		def f(a):
+			#print(str(a) + "->" + str(a+1))
+			time.sleep(0.0001)
+			return a + 1
+
+		inc = d.map(f, name="add 1", output_name="Numbers+1").collect()
+		equal = [i in xrange(1,100)]
+		self.assertEqual(sum(equal), 100)
 
