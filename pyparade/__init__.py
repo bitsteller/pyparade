@@ -14,7 +14,7 @@ TERMINAL_WIDTH = 80
 
 active_processes = []
 
-def signal_handler(signal, frame):
+def _signal_handler(signal, frame):
 	"""Used internally. Handles interruptions (like pressing CTRL-C) and stops running processes.
 	Args:
 		signal: Signal
@@ -143,13 +143,13 @@ class Dataset(operations.Source):
 					  argument and should return an iterable containing elements which are put into the output Dataset.
 			context: A function that returns a context manager. It is called once for each parallel executor 
 					 which executes map_func. For each call of map_func the context object is passed as the second argument.
-			**kwargs: Other arguments are passed on to `pyparade.operations.FlatMapOperation
+			**kwargs: Other arguments are passed on to `pyparade.operations.FlatMapOperation`
 		"""
 		op = operations.FlatMapOperation(self, map_func, context = context, **kwargs)
 		return Dataset(op)
 
 	def group_by_key(self, partly = False, **kwargs):
-		"""Returns a new `pyparade.Dataset` which results from grouping (key,value) tuples by their key into tuples (key, values).
+		"""Returns a new `pyparade.Dataset` which results from grouping (key,value) tuples by their key into tuples (key, [values]).
 
 		Args:
 			partly: If True, partial groups can be returned. This allows streaming processing with output 
@@ -160,13 +160,13 @@ class Dataset(operations.Source):
 		return Dataset(op)
 
 	def reduce_by_key(self, reduce_func, **kwargs):
-		"""Returns a new `pyparade.Dataset` which results from grouping (key,value) tuples by their key into tuples (key, values) 
-		and applying reduce_func to each (key,values) tuple.
+		"""Returns a new `pyparade.Dataset` which results from grouping (key,value) tuples by their key into tuples (key, [values]) 
+		and applying reduce_func to each (key,[values]) tuple.
 
 		Args:
-			reduce_func: The function to be applied to each (key,values) tuple. Has to accept a (key,values) tuple as the first 
+			reduce_func: The function to be applied to each (key,[values]) tuple. Has to accept a (key,[values]) tuple as the first 
 					  argument and should return a new element which is put into the output Dataset.
-			**kwargs: Other arguments are passed on to `pyparade.operations.ReduceByKeyOperation
+			**kwargs: Other arguments are passed on to `pyparade.operations.ReduceByKeyOperation`
 		"""
 		op = operations.ReduceByKeyOperation(self, reduce_func, **kwargs)
 		return Dataset(op)
@@ -182,7 +182,7 @@ class Dataset(operations.Source):
 					   Must return a new value that is again accepted as an argument to fold_func.
 			context: A function that returns a context manager. It is called once for each parallel executor 
 					 which executes map_func. For each call of map_func the context object is passed as the second argument.
-			**kwargs: Other arguments are passed on to `pyparade.operations.ReduceByKeyOperation
+			**kwargs: Other arguments are passed on to `pyparade.operations.FoldOperation`
 		"""
 		op = operations.FoldOperation(self, zero_value, fold_func, context = context, **kwargs)
 		return Dataset(op)
@@ -228,7 +228,7 @@ class Dataset(operations.Source):
 			proc = self.start_process(**args)
 			active_processes.append(proc)
 			old_handler = signal.getsignal(signal.SIGINT)
-			signal.signal(signal.SIGINT, signal_handler) #abort on CTRL-C
+			signal.signal(signal.SIGINT, _signal_handler) #abort on CTRL-C
 
 		if self._stop_requested.is_set():
 			self._stop_process(proc, old_handler)
@@ -252,39 +252,6 @@ class Dataset(operations.Source):
 			active_processes.remove(proc)
 
 		return result
-
-class Buffer(object):
-	def __init__(self, source, size):
-		super(Buffer, self).__init__()
-		self.source = source
-		self.size = size
-		self.queue = queue.Queue(size)
-		self._length = 0
-		self._length_lock = threading.Lock()
-
-	def __len__(self):
-		with self._length_lock:
-			return self._length
-
-	def full(self):
-		return self.queue.full()
-
-	def put(self, values):
-		self.queue.put(values, True)
-		with self._length_lock:
-			self._length += len(values)
-
-	def generate(self):
-		while not(self.queue.empty() and self.source.finished.is_set()):
-			try:
-				values = self.queue.get(True, timeout=1)
-				for value in values:
-					yield value
-					with self._length_lock:
-						self._length -= 1
-					
-			except Exception as e:
-				pass
 
 class ParallelProcess(object):
 	def __init__(self, dataset, name="Parallel process"):
@@ -400,3 +367,50 @@ class ParallelProcess(object):
 
 	def __str__(self):
 		return self.name
+
+class Buffer(object):
+	"""A thread-safe buffer used to read buffered from a `pyparade.operations.Source`"""
+	def __init__(self, source, size):
+		"""Creates a new Buffer.
+
+		Args:
+			source: The `pyparade.operations.Source` which the buffer reads from
+			size: The size of the buffer (number of elements to keep in the buffer) """
+
+		super(Buffer, self).__init__()
+		self.source = source
+		self.size = size
+		self.queue = queue.Queue(size)
+		self._length = 0
+		self._length_lock = threading.Lock()
+
+	def __len__(self):
+		with self._length_lock:
+			return self._length
+
+	def full(self):
+		"""Returns True if the buffer is full, that is the number of elements in the buffer is equal to the buffer size."""
+		return self.queue.full()
+
+	def put(self, values):
+		"""Puts a batch of elements into the buffer
+
+		Args:
+			values: An iterable containing the elements to but into the buffer. Must support calling len(values)."""
+
+		self.queue.put(values, True)
+		with self._length_lock:
+			self._length += len(values)
+
+	def generate(self):		
+		"""A generator yielding elements from the buffer. Runs until the underlying `pyparade.operations.Source` is finished."""
+
+		while not(self.queue.empty() and self.source.finished.is_set()):
+			try:
+				values = self.queue.get(True, timeout=1)
+				for value in values:
+					yield value
+					with self._length_lock:
+						self._length -= 1
+			except Exception as e:
+				pass
