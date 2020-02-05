@@ -188,11 +188,22 @@ class Dataset(operations.Source):
 		return Dataset(op)
 
 	def start_process(self, name="Parallel Process", num_workers=multiprocessing.cpu_count()):
+		"""Starts and returns a `pyparade.ParallelProcess` to collect elements in this dataset. 
+		Normally called indirectly using `pyparade.Dataset.collect`.
+
+		Args:
+			name: Name of the parallel process
+			num_workers: Number of parallel workers to use (default: number of available CPUs)  """
 		proc = ParallelProcess(self, name)
 		proc.run(num_workers)
 		return proc
 
 	def _stop_process(self, process, old_handler):
+		"""Internal method to stop a parellel process.
+
+		Args:
+			name: Name of the parallel process
+			num_workers: Number of parallel workers to use (default: number of available CPUs)  """
 		global active_processes
 
 		if old_handler != None:
@@ -215,7 +226,7 @@ class Dataset(operations.Source):
 		raise RuntimeError("Process was stopped")
 
 	def collect(self, **args):
-		"""Returns a list of all elements in this Source. 
+		"""Returns a list of all elements in this dataset. 
 		Starts a `ParallelProcess` in order to collect the data.
 
 		Args:
@@ -254,7 +265,13 @@ class Dataset(operations.Source):
 		return result
 
 class ParallelProcess(object):
+	"""A parallel process that collects data in a `pyparade.Dataset`"""
 	def __init__(self, dataset, name="Parallel process"):
+		"""Creates a new parallel process
+		Args:
+			dataset: The `pyparade.Dataset` which the process should collect
+			name: The display name for the process"""
+
 		self.dataset = dataset
 		self.result = []
 		self.name = name
