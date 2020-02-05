@@ -156,7 +156,7 @@ class BatchOperation(Operation):
 		Args:
 			source: The `pyparade.Dataset`to use as the source of elements
 			batch_size: The number of elements in each batch 
-			**kwargs: Other arguments are passed on to `pyparade.Operation.__init__`
+			**kwargs: Other arguments are passed on to `pyparade.operations.Operation.__init__`
 		"""
 		super(BatchOperation, self).__init__(source, name = name, **kwargs)
 		if batch_size >= 1:

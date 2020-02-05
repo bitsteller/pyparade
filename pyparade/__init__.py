@@ -141,7 +141,7 @@ class Dataset(operations.Source):
 
 	def flat_map(self, map_func, context = None, **kwargs):
 		"""Returns a new `pyparade.Dataset` which results from applying map_func to each element in 
-		this Dataset and iterating through the elements returned
+		this Dataset and combining the returned lists in a flat list.
 
 		Supplying a context can be used to establish a connection to a common resource such as a database.
 
@@ -151,6 +151,14 @@ class Dataset(operations.Source):
 			context: A function that returns a context manager. It is called once for each parallel executor 
 					 which executes map_func. For each call of map_func the context object is passed as the second argument.
 			**kwargs: Other arguments are passed on to `pyparade.operations.FlatMapOperation`
+
+		Example:
+			>>> import pyparade
+			>>> d = pyparade.Dataset(["This is a test", "a b c"])
+			>>> d.map(str.split).collect() #split by space (map)
+			[["This", "is", "a", "test"], ["a", "b", "c"]]
+			>>> d.flat_map(str.split).collect() #split by space and flat map
+			["This", "is", "a", "test", "a", "b", "c"]
 		"""
 		op = operations.FlatMapOperation(self, map_func, context = context, **kwargs)
 		return Dataset(op)
