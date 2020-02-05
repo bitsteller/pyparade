@@ -155,6 +155,23 @@ class Dataset(operations.Source):
 		op = operations.FlatMapOperation(self, map_func, context = context, **kwargs)
 		return Dataset(op)
 
+	def batch(self, batch_size=1, **kwargs):
+		"""Returns a new `pyparade.Dataset` containing the elements of this dataset in batches (lists of equal length)
+
+		Args:
+			batch_size: The number of elements to put in each batch
+			**kwargs: Other arguments are passed on to `pyparade.operations.BatchOperation
+
+		Example:
+			>>> import pyparade
+			>>> d = pyparade.Dataset(1,2,3,4,5)
+			>>> d.batch(2).collect()
+			[[1,2],[3,4],[5]]
+
+		"""
+		op = operations.BatchOperation(self, batch_size=batch_size, **kwargs)
+		return Dataset(op)
+
 	def group_by_key(self, partly = False, **kwargs):
 		"""Returns a new `pyparade.Dataset` which results from grouping (key,value) tuples by their key into tuples (key, [values]).
 

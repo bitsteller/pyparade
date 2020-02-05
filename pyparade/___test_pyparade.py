@@ -94,3 +94,11 @@ class TestPyParade(unittest.TestCase):
 		equal = [i in xrange(1,100)]
 		self.assertEqual(sum(equal), 100)
 
+	def test_batch(self):
+		d = pyparade.Dataset(list(range(0,1000)), name="Numbers")
+
+		batches = d.batch(10).collect()
+		self.assertEqual(len(batches), 100)
+		self.assertEqual(batches[0][0], 0)
+		self.assertEqual(batches[99][9], 999)
+

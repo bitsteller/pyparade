@@ -148,6 +148,41 @@ class FlatMapOperation(MapOperation):
 			#flatten result
 			for r in response: 
 				self._output(r)
+
+class BatchOperation(Operation):
+	def __init__(self, source, batch_size, name = "Batch", **kwargs):
+		"""An operation that returns the elements of the source in batches of n elements.
+
+		Args:
+			source: The `pyparade.Dataset`to use as the source of elements
+			batch_size: The number of elements in each batch 
+			**kwargs: Other arguments are passed on to `pyparade.Operation.__init__`
+		"""
+		super(BatchOperation, self).__init__(source, name = name, **kwargs)
+		if batch_size >= 1:
+			self.batch_size = batch_size
+		else:
+			raise ValueError("Illegal batch size")
+
+	def run(self):
+		#pack batches
+		n = 0
+		batch = []
+		for element in self._generate_input():
+			if self._check_stop():
+				self.pool.stop()
+				return
+
+			batch.append(element)
+			n = n + 1
+			self.processed += 1
+			
+			if n >= self.batch_size: #batch full
+				self._output(batch)
+				n = 0
+				batch = []
+		self._output(batch)
+
 		
 class GroupByKeyOperation(Operation):
 	"""Groups the key/value pairs and yields tuples (key, [list of values])"""
