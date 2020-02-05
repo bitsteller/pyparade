@@ -128,6 +128,13 @@ class Dataset(operations.Source):
 			context: A function that returns a context manager. It is called once for each parallel executor 
 					 which executes map_func. For each call of map_func the context object is passed as the second argument.
 			**kwargs: Other arguments are passed on to `pyparade.operations.MapOperation
+
+		Example:
+			>>> import pyparade
+			>>> d = pyparade.Dataset([1,2,3])
+			>>> d.map(lambda a: a + 1).collect() #add 1 to each element
+			[2,3,4]
+
 		"""
 		op = operations.MapOperation(self, map_func, context = context, **kwargs)
 		return Dataset(op)
@@ -155,6 +162,13 @@ class Dataset(operations.Source):
 			partly: If True, partial groups can be returned. This allows streaming processing with output 
 					starting before all elements in the dataset have been processed.
 			**kwargs: Other arguments are passed on to `pyparade.operations.GroupByKeyOperation
+
+		Example:
+			>>> import pyparade
+			>>> d = pyparade.Dataset([("a", 1), ("b", 1), ("a",2)])
+			>>> d.group_by_key().collect()
+			[("a", [1,2]), ("b", [1])]
+
 		"""
 		op = operations.GroupByKeyOperation(self, partly = partly, **kwargs)
 		return Dataset(op)
@@ -183,6 +197,12 @@ class Dataset(operations.Source):
 			context: A function that returns a context manager. It is called once for each parallel executor 
 					 which executes map_func. For each call of map_func the context object is passed as the second argument.
 			**kwargs: Other arguments are passed on to `pyparade.operations.FoldOperation`
+
+		Example:
+			>>> import pyparade, operator
+			>>> d = pyparade.Dataset([1,2,3])
+			>>> d.fold(0, operator.add).collect() #sum elements
+			[6]
 		"""
 		op = operations.FoldOperation(self, zero_value, fold_func, context = context, **kwargs)
 		return Dataset(op)
