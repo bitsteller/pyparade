@@ -316,7 +316,10 @@ class ParallelProcess(object):
 		"""Creates a new parallel process
 		Args:
 			dataset: The `pyparade.Dataset` which the process should collect
-			name: The display name for the process"""
+			name: The display name for the process
+			print_status: Display status information during processing?
+			print_status_interval: Update interval of status information in seconds
+		"""
 
 		self.dataset = dataset
 		self.result = []
