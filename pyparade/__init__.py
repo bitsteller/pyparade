@@ -232,14 +232,15 @@ class Dataset(operations.Source):
 		op = operations.FoldOperation(self, zero_value, fold_func, context = context, **kwargs)
 		return Dataset(op)
 
-	def start_process(self, name="Parallel Process", num_workers=multiprocessing.cpu_count()):
+	def start_process(self, name="Parallel Process", num_workers=multiprocessing.cpu_count(), **kwargs):
 		"""Starts and returns a `pyparade.ParallelProcess` to collect elements in this dataset. 
 		Normally called indirectly using `pyparade.Dataset.collect`.
 
 		Args:
 			name: Name of the parallel process
-			num_workers: Number of parallel workers to use (default: number of available CPUs)  """
-		proc = ParallelProcess(self, name)
+			num_workers: Number of parallel workers to use (default: number of available CPUs)  
+			kwargs: remaining keyword arguments are passed on to ParallelProcess"""
+		proc = ParallelProcess(self, name, **kwargs)
 		proc.run(num_workers)
 		return proc
 
@@ -311,7 +312,7 @@ class Dataset(operations.Source):
 
 class ParallelProcess(object):
 	"""A parallel process that collects data in a `pyparade.Dataset`"""
-	def __init__(self, dataset, name="Parallel process"):
+	def __init__(self, dataset, name="Parallel process", print_status=True, print_status_interval=15):
 		"""Creates a new parallel process
 		Args:
 			dataset: The `pyparade.Dataset` which the process should collect
@@ -320,6 +321,8 @@ class ParallelProcess(object):
 		self.dataset = dataset
 		self.result = []
 		self.name = name
+		self.print_status = print_status
+		self.print_status_interval = print_status_interval
 
 	def run(self, num_workers = multiprocessing.cpu_count()):
 		#Build process tree
@@ -337,8 +340,9 @@ class ParallelProcess(object):
 			t.start()
 			threads.append(t)
 
-		ts = threading.Thread(target = self.print_status)
-		ts.start()
+		if self.print_status:
+			ts = threading.Thread(target = self.print_status)
+			ts.start()
 
 	def stop(self):
 		[s.stop() for s in self.chain]
@@ -359,7 +363,7 @@ class ParallelProcess(object):
 			try:
 				time.sleep(1)
 				t += 1
-				if t >= 10:
+				if t >= self.print_status_interval:
 					self.clear_screen()
 					print(self.get_status())
 					t = 0
