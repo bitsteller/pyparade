@@ -3,7 +3,6 @@ setup.py
 pyparade/___test_pyparade.py
 pyparade/__init__.py
 pyparade/operations.py
-pyparade/test.py
 pyparade.egg-info/PKG-INFO
 pyparade.egg-info/SOURCES.txt
 pyparade.egg-info/dependency_links.txt

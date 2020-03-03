@@ -312,7 +312,7 @@ class Dataset(operations.Source):
 
 class ParallelProcess(object):
 	"""A parallel process that collects data in a `pyparade.Dataset`"""
-	def __init__(self, dataset, name="Parallel process", print_status=True, print_status_interval=15):
+	def __init__(self, dataset, name="Parallel process", status=True, status_interval=15):
 		"""Creates a new parallel process
 		Args:
 			dataset: The `pyparade.Dataset` which the process should collect
@@ -324,8 +324,8 @@ class ParallelProcess(object):
 		self.dataset = dataset
 		self.result = []
 		self.name = name
-		self.print_status = print_status
-		self.print_status_interval = print_status_interval
+		self.status = status
+		self.status_interval = status_interval
 
 	def run(self, num_workers = multiprocessing.cpu_count()):
 		#Build process tree
@@ -343,7 +343,7 @@ class ParallelProcess(object):
 			t.start()
 			threads.append(t)
 
-		if self.print_status:
+		if self.status:
 			ts = threading.Thread(target = self.print_status)
 			ts.start()
 
@@ -366,7 +366,7 @@ class ParallelProcess(object):
 			try:
 				time.sleep(1)
 				t += 1
-				if t >= self.print_status_interval:
+				if t >= self.status_interval:
 					self.clear_screen()
 					print(self.get_status())
 					t = 0
