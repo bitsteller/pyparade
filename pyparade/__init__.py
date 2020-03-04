@@ -476,10 +476,13 @@ class Buffer(object):
 
 		while not(self.queue.empty() and self.source.finished.is_set()):
 			try:
+				print("get")
 				values = self.queue.get(True, timeout=1)
+				print("get success")
 				for value in values:
 					yield value
 					with self._length_lock:
 						self._length -= 1
 			except Exception as e:
 				pass
+		print("gen end")
