@@ -71,28 +71,27 @@ class TestPyParade(unittest.TestCase):
 			k,v = kv
 			return v
 
-		result = pyparade.Dataset(list(range(0,1000000)), name="Numbers") \
+		result = pyparade.Dataset(list(range(0,100000)), name="Numbers") \
 					.map(f, name="calculate", output_name="Key/Value pairs") \
 				 	.map(g, name="take value", output_name="Values") \
 				 	.fold(0,operator.add,name="sum", output_name="Sum").collect()
-		self.assertEqual(result[0], sum(range(1,1000001)))
+		self.assertEqual(result[0], sum(range(1,100001)))
 
 	def test_map(self):
 		def slow_generator():
-			for i in xrange(1,100):
+			for i in range(1,100):
 				time.sleep(0.1)
 				yield i
-
-		d = pyparade.Dataset(slow_generator, length=100, name="Slowly generated dataset")
 		
 		def f(a):
 			#print(str(a) + "->" + str(a+1))
 			time.sleep(0.0001)
 			return a + 1
 
+		d = pyparade.Dataset(slow_generator(), length=100, name="Slowly generated dataset")
 		inc = d.map(f, name="add 1", output_name="Numbers+1").collect()
-		equal = [i in xrange(1,100)]
-		self.assertEqual(sum(equal), 100)
+		equal = [i+1 for i in range(1,100)]
+		self.assertEqual(sum(equal), sum(inc))
 
 	def test_batch(self):
 		d = pyparade.Dataset(list(range(0,1000)), name="Numbers")
@@ -102,3 +101,13 @@ class TestPyParade(unittest.TestCase):
 		self.assertEqual(batches[0][0], 0)
 		self.assertEqual(batches[99][9], 999)
 
+	def test_error(self):
+		def throw_error(value):
+			if value == 9:
+				raise ValueError(value)
+			else:
+				return value
+
+		d = pyparade.Dataset([1,2,3,4,5,6,7,8,9], name="Number")
+
+		self.assertRaises(ValueError, d.map(throw_error).collect)
