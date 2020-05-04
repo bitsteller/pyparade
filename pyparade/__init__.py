@@ -81,12 +81,16 @@ class Dataset(operations.Source):
 
 		for value in values:
 			if self._check_stop():
-				return
+				break
 
 			while len([buf for buf in self._buffers if buf.full()]) > 0:
 				if self._check_stop():
-					return
+					break
 				time.sleep(1)
+
+			if self._check_stop():
+				break
+
 			batch.append(value)
 
 			if self._length_is_estimated:
@@ -99,7 +103,7 @@ class Dataset(operations.Source):
 
 		while len([buf for buf in self._buffers if buf.full()]) > 0:
 			if self._check_stop():
-				return
+				break
 			time.sleep(1)
 
 		[buf.put(batch) for buf in self._buffers]
@@ -363,8 +367,8 @@ class ParallelProcess(object):
 	def print_status(self):
 		started = time.time()
 
-		self.clear_screen()
-		print(self.get_status())
+		#self.clear_screen()
+		#print(self.get_status())
 		t = 0
 		while not len([s for s in self.chain if s.finished.is_set()]) == len(self.chain):
 			try:
@@ -479,7 +483,7 @@ class Buffer(object):
 		with self._length_lock:
 			self._length += len(values)
 
-	def generate(self):		
+	def generate(self):
 		"""A generator yielding elements from the buffer. Runs until the underlying `pyparade.operations.Source` is finished."""
 
 		while not(self.queue.empty() and self.source.finished.is_set()) or self.source._stop_requested.is_set():
@@ -492,9 +496,15 @@ class Buffer(object):
 			except Exception as e:
 				pass
 
+
 		chain = [self.source] + self.source.get_parents()
+		chain.reverse()
+
+		for s in chain:
+			s.stop()
+		
 		for s in chain:
 			if s.exception:
 				ex_type, ex_value, tb_str = s.exception
-				message = '%s (in %s)' % (ex_value.message, s.name)
+				message = '%s (in %s)' % (str(ex_value), s.name)
 				raise ex_type(message)

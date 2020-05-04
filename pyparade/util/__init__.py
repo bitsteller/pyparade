@@ -186,7 +186,7 @@ class ParMap(object):
 
 				if "error" in jobs[minjobid]:
 					ex_type, ex_value, tb_str = jobs[minjobid]["error"]
-					message = '%s (in subprocess)\n%s' % (ex_value.message, tb_str)
+					message = '%s (in subprocess)\n%s' % (str(ex_value), tb_str)
 					raise ex_type(message)
 
 				for r in jobs[minjobid]["results"]:
@@ -248,7 +248,7 @@ class ParMap(object):
 							pass
 						
 					ex_type, ex_value, tb_str = jobs[minjobid]["error"]
-					message = '%s (in subprocess)\n%s' % (ex_value.message, tb_str)
+					message = '%s (in subprocess)\n%s' % (str(ex_value), tb_str)
 					raise ex_type(message)
 
 				for r in jobs[minjobid]["results"]:

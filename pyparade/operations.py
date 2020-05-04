@@ -68,9 +68,7 @@ class Operation(Source):
 
 		self._thread = threading.Thread(target=_run, name=str(self))
 		self._thread.start()
-		while self._thread.is_alive():
-			if self._check_stop():
-				break
+		while self._thread.is_alive() and not self._check_stop():
 			try:
 				batch = self._outbuffer.get(True, timeout=1)
 				for value in batch:
@@ -78,11 +76,10 @@ class Operation(Source):
 			except Exception as e:
 				pass
 
-		self._flush_output()
+		if self._check_stop():
+			self._flush_output()
 
-		while not self._outbuffer.empty():
-			if self._check_stop():
-				break
+		while not self._outbuffer.empty() and not self._check_stop():
 			try:
 				batch = self._outbuffer.get(True, timeout=1)
 				for value in batch:
