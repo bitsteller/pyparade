@@ -14,7 +14,7 @@
 - Improved: Adjusted test cases for Python 3
 - Fixed: collect() raises exception when any operation fails instead of waiting infinitly
 - Fixed: Output of empty batch in the end of batch operation
-- Fixed: Potential loss of data at the end of a 
+- Fixed: Potential loss of data at the end of a datasource
 - Fixed: BTree not closing files properly
 
 0.4.1 (2020-03-03)
