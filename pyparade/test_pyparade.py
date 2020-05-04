@@ -100,7 +100,8 @@ class TestPyParade(unittest.TestCase):
 		self.assertEqual(len(batches), 100)
 		self.assertEqual(batches[0][0], 0)
 		self.assertEqual(batches[99][9], 999)
-
+		print("Test")
+		
 	def test_error(self):
 		def throw_error(value):
 			if value == 3:
