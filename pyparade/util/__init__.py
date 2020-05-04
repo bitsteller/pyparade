@@ -9,6 +9,7 @@ from builtins import object
 import multiprocessing, time, math, traceback, queue
 from multiprocessing import Process
 import multiprocessing
+import sys
 
 def sstr(obj):
 	""" converts any object to str, if necessary encodes unicode chars """
@@ -184,7 +185,9 @@ class ParMap(object):
 				#print(self._chunksize)
 
 				if "error" in jobs[minjobid]:
-					raise jobs[minjobid]["error"]
+					ex_type, ex_value, tb_str = jobs[minjobid]["error"]
+					message = '%s (in subprocess)\n%s' % (ex_value.message, tb_str)
+					raise ex_type(message)
 
 				for r in jobs[minjobid]["results"]:
 					yield r
@@ -238,11 +241,15 @@ class ParMap(object):
 					#shutdown workers
 					for worker in workers:
 						try:
+							worker["connection"].send(None) #send shutdown command
 							worker["connection"].close()
 							worker["process"].join()
 						except Exception as e:
 							pass
-					raise jobs[minjobid]["error"]
+						
+					ex_type, ex_value, tb_str = jobs[minjobid]["error"]
+					message = '%s (in subprocess)\n%s' % (ex_value.message, tb_str)
+					raise ex_type(message)
 
 				for r in jobs[minjobid]["results"]:
 					yield r
@@ -266,10 +273,13 @@ class ParMap(object):
 						self._map_batch(conn, batch, c)
 						batch = conn.recv()
 			except Exception as e: #worker not initialized, return error for all incoming jobs
+				ex_type, ex_value, tb = sys.exc_info()
+				error = (ex_type, ex_value, ''.join(traceback.format_tb(tb)))
+
 				batch = conn.recv()
 				while batch != None and not self.request_stop.is_set():
 					jobinfo = {}
-					jobinfo["error"] = e
+					jobinfo["error"] = error
 					jobinfo["stopped"] = time.time()
 					conn.send(jobinfo)
 					batch = conn.recv()
@@ -285,7 +295,7 @@ class ParMap(object):
 		for value in batch:
 			if self.request_stop.is_set():
 				jobinfo = {}
-				jobinfo["error"] = Exception("stop requested")
+				jobinfo["error"] = (Exception, "stop requested", "")
 				jobinfo["stopped"] = time.time()
 				conn.send(jobinfo)
 				return
@@ -295,10 +305,13 @@ class ParMap(object):
 				else:
 					results.append(self.map_func(value))
 			except Exception as e:
-				traceback.print_stack()
-				print(e)
+				#traceback.print_stack()
+				#print(e)
+				ex_type, ex_value, tb = sys.exc_info()
+				error = ex_type, ex_value, ''.join(traceback.format_tb(tb))
+				
 				jobinfo = {}
-				jobinfo["error"] = e
+				jobinfo["error"] = error
 				jobinfo["stopped"] = time.time()
 				conn.send(jobinfo)
 				return

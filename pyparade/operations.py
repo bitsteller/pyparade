@@ -3,7 +3,7 @@ standard_library.install_aliases()
 from builtins import str
 from builtins import zip
 from builtins import object
-import threading, multiprocessing, queue, time, collections
+import threading, multiprocessing, queue, time, collections, sys, traceback
 
 from pyparade.util import ParMap
 from pyparade.util.btree import BTree
@@ -16,6 +16,8 @@ class Source(object):
 		self.finished = threading.Event()
 		self.name = name
 		self.output_name = output_name
+		self.processes = []
+		self.exception = None
 
 	def get_parents(self):
 		parents = [self]
@@ -56,15 +58,23 @@ class Operation(Source):
 		self.running.set()
 		self.time_started = time.time()
 
-		self._thread = threading.Thread(target=self.run, name=str(self))
+		def _run():
+			try:
+				self.run()
+			except BaseException as e:
+				ex_type, ex_value, tb = sys.exc_info()
+				error = (ex_type, ex_value, ''.join(traceback.format_tb(tb)))
+				self.exception = error
+
+		self._thread = threading.Thread(target=_run, name=str(self))
 		self._thread.start()
 		while self._thread.is_alive():
 			if self._check_stop():
-				return
+				break
 			try:
 				batch = self._outbuffer.get(True, timeout=1)
 				for value in batch:
-					yield value 
+					yield value
 			except Exception as e:
 				pass
 
@@ -72,7 +82,7 @@ class Operation(Source):
 
 		while not self._outbuffer.empty():
 			if self._check_stop():
-				return
+				break
 			try:
 				batch = self._outbuffer.get(True, timeout=1)
 				for value in batch:
@@ -83,6 +93,10 @@ class Operation(Source):
 		self.time_finished = time.time()
 		self.finished.set()
 		self.running.clear()
+
+		#if self.exception != None:
+		#	[process.stop() for process in self.processes]
+		#	raise self.exception
 
 	def _output(self, value):
 		self._outbatch.append(value)

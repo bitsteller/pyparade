@@ -6,7 +6,7 @@ from future import standard_library
 standard_library.install_aliases()
 from builtins import str
 from builtins import object
-import queue, threading, time, sys, datetime, multiprocessing, signal, threading
+import queue, threading, time, sys, datetime, multiprocessing, signal, threading, sys
 
 from . import operations
 
@@ -78,6 +78,7 @@ class Dataset(operations.Source):
 
 		batch = []
 		last_insert = 0
+
 		for value in values:
 			if self._check_stop():
 				return
@@ -333,12 +334,15 @@ class ParallelProcess(object):
 		chain.reverse()
 		self.chain = chain
 
+		for source in self.chain:
+			source.processes.append(self)
+
 		#set number of workers
 		for operation in [block for block in chain if isinstance(block, operations.Operation)]:
 			operation.num_workers = num_workers
 
 		threads = []
-		for dataset in [block for block in chain if isinstance(block,Dataset)]:
+		for dataset in [block for block in chain if isinstance(block, Dataset)]:
 			t = threading.Thread(target = dataset._fill_buffers, name="Buffer")
 			t.start()
 			threads.append(t)
@@ -404,21 +408,25 @@ class ParallelProcess(object):
 	def get_operation_status(self, op):
 		status = ""
 
-		if op.source.has_length():
-			if not op.source.length_is_estimated() and len(op.source) > 0 and op.processed > 0:
-				if op.processed == len(op.source):
-					status += "done"
-				elif op.running.is_set():
-					est = datetime.datetime.now() + datetime.timedelta(seconds = (time.time()-op.time_started)/op.processed*(len(op.source)-op.processed))
-					status += '{0:%}'.format(float(op.processed)/len(op.source)) + "  ETA " + est.strftime("%Y-%m-%d %H:%M") + " "
-					status += str(op.processed) + "/" + str(len(op.source))
+		if op.exception == None:
+			if op.source.has_length():
+				if not op.source.length_is_estimated() and len(op.source) > 0 and op.processed > 0:
+					if op.processed == len(op.source):
+						status += "done"
+					elif op.running.is_set():
+						est = datetime.datetime.now() + datetime.timedelta(seconds = (time.time()-op.time_started)/op.processed*(len(op.source)-op.processed))
+						status += '{0:%}'.format(float(op.processed)/len(op.source)) + "  ETA " + est.strftime("%Y-%m-%d %H:%M") + " "
+						status += str(op.processed) + "/" + str(len(op.source))
+					else:
+						status += "stopped"
 				else:
-					status += "stopped"
+					status += str(op.processed) + "/" + str(len(op.source))
 			else:
-				status += str(op.processed) + "/" + str(len(op.source))
+				if not op.running.is_set():
+					status += "stopped"
 		else:
-			if not op.running.is_set():
-				status += "stopped"
+			status += "FAILED"
+
 
 		title = util.shorten(str(op), (TERMINAL_WIDTH - len(str(op)) - len(status) - 2))
 		space = " "*(TERMINAL_WIDTH - len(str(title)) - len(status) - 1)
@@ -474,7 +482,7 @@ class Buffer(object):
 	def generate(self):		
 		"""A generator yielding elements from the buffer. Runs until the underlying `pyparade.operations.Source` is finished."""
 
-		while not(self.queue.empty() and self.source.finished.is_set()):
+		while not(self.queue.empty() and self.source.finished.is_set()) or self.source._stop_requested.is_set():
 			try:
 				values = self.queue.get(True, timeout=1)
 				for value in values:
@@ -483,3 +491,10 @@ class Buffer(object):
 						self._length -= 1
 			except Exception as e:
 				pass
+
+		chain = [self.source] + self.source.get_parents()
+		for s in chain:
+			if s.exception:
+				ex_type, ex_value, tb_str = s.exception
+				message = '%s (in %s)' % (ex_value.message, s.name)
+				raise ex_type(message)
