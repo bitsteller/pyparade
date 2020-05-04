@@ -103,7 +103,7 @@ class TestPyParade(unittest.TestCase):
 
 	def test_error(self):
 		def throw_error(value):
-			if value == 9:
+			if value == 3:
 				raise ValueError(value)
 			else:
 				return value

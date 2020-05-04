@@ -185,6 +185,16 @@ class ParMap(object):
 				#print(self._chunksize)
 
 				if "error" in jobs[minjobid]:
+					self.request_stop.set()
+					#shutdown workers
+					for worker in workers:
+						try:
+							worker["connection"].send(None) #send shutdown command
+							worker["connection"].close()
+							worker["process"].join()
+						except Exception as e:
+							pass
+						
 					ex_type, ex_value, tb_str = jobs[minjobid]["error"]
 					message = '%s (in subprocess)\n%s' % (str(ex_value), tb_str)
 					raise ex_type(message)
