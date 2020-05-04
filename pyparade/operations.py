@@ -195,7 +195,9 @@ class BatchOperation(Operation):
 				self._output(batch)
 				n = 0
 				batch = []
-		self._output(batch)
+		
+		if n > 0:
+			self._output(batch)
 
 		
 class GroupByKeyOperation(Operation):
