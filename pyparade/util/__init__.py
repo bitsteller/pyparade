@@ -108,7 +108,6 @@ class ParMap(object):
 	def stop(self):
 		"""Requests all active workers connected to a running parallel mapping to stop.
 		Note that stopping workers is done asynchrously and can take while, even though this function returns immediately."""
-
 		self.request_stop.set()
 
 	def job_is_finished(self, job, timeout = 0.0):
@@ -237,8 +236,6 @@ class ParMap(object):
 
 		#wait for all jobs to finish
 		while len(jobs) > 0:
-			#for job in jobs.itervalues():
-				#print("waiting for " + str(job["worker"]["process"].pid))
 			if (self.job_is_finished(jobs[min(jobs.keys())], timeout = 1.0)):
 				minjobid = min(jobs.keys())
 				if (not "stopped" in jobs[minjobid]) and jobs[minjobid]["worker"]["connection"].poll():
@@ -275,29 +272,41 @@ class ParMap(object):
 				pass
 
 	def _work(self, conn, context_func):
+		shutdown_requested = False
+
 		if context_func != None:
 			try:
 				with context_func() as c:
-					batch = conn.recv()
-					while batch != None and not self.request_stop.is_set():
-						self._map_batch(conn, batch, c)
-						batch = conn.recv()
+					while not shutdown_requested and not self.request_stop.is_set():
+						if conn.poll(1):
+							batch = conn.recv()
+							if batch != None:
+								self._map_batch(conn, batch, c)
+							else:
+								shutdown_requested = True
 			except Exception as e: #worker not initialized, return error for all incoming jobs
 				ex_type, ex_value, tb = sys.exc_info()
 				error = (ex_type, ex_value, ''.join(traceback.format_tb(tb)))
 
-				batch = conn.recv()
-				while batch != None and not self.request_stop.is_set():
-					jobinfo = {}
-					jobinfo["error"] = error
-					jobinfo["stopped"] = time.time()
-					conn.send(jobinfo)
-					batch = conn.recv()
+				while not shutdown_requested and not self.request_stop.is_set():
+					if conn.poll(1):
+						batch = conn.recv()
+						if batch != None:
+							jobinfo = {}
+							jobinfo["error"] = error
+							jobinfo["stopped"] = time.time()
+							conn.send(jobinfo)
+							batch = conn.recv()
+						else:
+							shutdown_requested = True
 		else:
-			batch = conn.recv()
-			while batch != None and not self.request_stop.is_set():
-				self._map_batch(conn, batch)
-				batch = conn.recv()
+			while not shutdown_requested and not self.request_stop.is_set():
+				if conn.poll(1):
+					batch = conn.recv()
+					if batch != None:
+						self._map_batch(conn, batch)
+					else:
+						shutdown_requested = True
 		conn.close()
 
 	def _map_batch(self, conn, batch, context = None):
@@ -315,8 +324,6 @@ class ParMap(object):
 				else:
 					results.append(self.map_func(value))
 			except Exception as e:
-				#traceback.print_stack()
-				#print(e)
 				ex_type, ex_value, tb = sys.exc_info()
 				error = ex_type, ex_value, ''.join(traceback.format_tb(tb))
 				
@@ -329,5 +336,4 @@ class ParMap(object):
 		jobinfo = {}
 		jobinfo["stopped"] = time.time()
 		jobinfo["results"] = results
-		#print("done:" + str(multiprocessing.current_process().pid))
 		conn.send(jobinfo)

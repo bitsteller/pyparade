@@ -413,7 +413,11 @@ class ParallelProcess(object):
 	def get_operation_status(self, op):
 		status = ""
 
-		if op.exception == None:
+		if op.exception != None:
+			status += "FAILED"
+		elif op._check_stop():
+			status += "stopping"
+		else:
 			if op.source.has_length():
 				if not op.source.length_is_estimated() and len(op.source) > 0 and op.processed > 0:
 					if op.processed == len(op.source):
@@ -429,8 +433,7 @@ class ParallelProcess(object):
 			else:
 				if not op.running.is_set():
 					status += "stopped"
-		else:
-			status += "FAILED"
+			
 
 
 		title = util.shorten(str(op), (TERMINAL_WIDTH - len(str(op)) - len(status) - 2))
@@ -509,8 +512,8 @@ class Buffer(object):
 		
 		for s in chain:
 			if s.exception:
-				for sc in chain: #stop all operations
-					sc.stop()
+				for p in self.source.processes:
+					p.stop()
 				ex_type, ex_value, tb_str = s.exception
 				message = '%s (in %s)' % (str(ex_value), s.name)
 				raise ex_type(message)

@@ -4,6 +4,7 @@
 - Improved: Exceptions now keep original traceback details
 - Improved: Exceptions now include the operation name where the exception occured
 - Improved: Show if an operation failed in status display
+- Improved: Improved stop handling in many operations
 - Fix: collect() raises exception when any operation fails instead of waiting infinitly
 - Fix: Don't output empty batch in the end of batch operation
 - Fix: Potential loss of data at the end of a dataset

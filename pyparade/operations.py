@@ -95,6 +95,9 @@ class Operation(Source):
 			except Exception as e:
 				pass
 
+		if self._check_stop() and hasattr(self, "pool"):
+			self.pool.stop()
+
 		self.time_finished = time.time()
 		self.finished.set()
 		self.running.clear()
