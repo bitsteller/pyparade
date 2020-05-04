@@ -366,7 +366,8 @@ class BTreeFileLeafNode(BTreeMemoryLeafNode):
 	def ensure_load(self):
 		if not(self.isloaded):
 			if os.path.isfile(self.filename):
-				leafjson = json.loads(open(self.filename).read())
+				with open(self.filename).read() as f:
+					leafjson = json.loads()
 				if leafjson["version"] != 1:
 					raise IOException("Version of B+ tree page file " + sstr(self.filename) + " is not compatible.")
 
@@ -407,9 +408,9 @@ class BTreeFileLeafNode(BTreeMemoryLeafNode):
 
 			s = json.dumps(leafjson, indent=3)
 			self.hash = sstr(hashlib.md5(s.encode('utf-8')).hexdigest())
-			f = open(self.filename, 'w')
-			f.write(s + "\n")
-			f.close()
+			with open(self.filename, 'w') as f:
+				f.write(s + "\n")
+				f.close()
 			self.leaffactory.page_changed(self, None)
 
 	def to_JSON(self):

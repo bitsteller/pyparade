@@ -5,9 +5,11 @@
 - Improved: Exceptions now include the operation name where the exception occured
 - Improved: Show if an operation failed in status display
 - Improved: Improved stop handling in many operations
-- Fix: collect() raises exception when any operation fails instead of waiting infinitly
-- Fix: Don't output empty batch in the end of batch operation
-- Fix: Potential loss of data at the end of a dataset
+- Improved: Adjusted test cases for Python 3
+- Fixed: collect() raises exception when any operation fails instead of waiting infinitly
+- Fixed: Output of empty batch in the end of batch operation
+- Fixed: Potential loss of data at the end of a 
+- Fixed: BTree not closing files properly
 
 0.4.1 (2020-03-03)
 ------------------
