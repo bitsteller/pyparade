@@ -1,8 +1,12 @@
 0.4.2 (unreleased)
 ------------------
 
-- Nothing changed yet.
-
+- Improved: Exceptions now keep original traceback details
+- Improved: Exceptions now include the operation name where the exception occured
+- Improved: Show if an operation failed in status display
+- Fix: collect() raises exception when any operation fails instead of waiting infinitly
+- Fix: Don't output empty batch in the end of batch operation
+- Fix: Potential loss of data at the end of a dataset
 
 0.4.1 (2020-03-03)
 ------------------

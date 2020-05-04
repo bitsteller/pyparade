@@ -27,6 +27,7 @@ class Source(object):
 
 	def _check_stop(self):
 		if self._stop_requested.is_set():
+
 			self.finished.set()
 			self.running.clear()
 			return True
@@ -40,6 +41,10 @@ class Source(object):
 	def __str__(self):
 		return self.name
 
+class OutputEndMarker():
+	def __init__(self):
+		pass
+
 class Operation(Source):
 	def __init__(self, source, num_workers=multiprocessing.cpu_count(), context = None, **kwargs):
 		super(Operation, self).__init__(**kwargs)
@@ -47,7 +52,7 @@ class Operation(Source):
 		self.inbuffer = source._get_buffer()
 		self._outbuffer = queue.Queue(10)
 		self._last_output = time.time()
-		self._outbatch = []
+		self._outbatch = queue.Queue()
 		self.processed = 0
 		self.time_started = None
 		self.time_finished = None
@@ -65,9 +70,13 @@ class Operation(Source):
 				ex_type, ex_value, tb = sys.exc_info()
 				error = (ex_type, ex_value, ''.join(traceback.format_tb(tb)))
 				self.exception = error
+			finally:
+				self._outputs(OutputEndMarker())
+
 
 		self._thread = threading.Thread(target=_run, name=str(self))
 		self._thread.start()
+
 		while self._thread.is_alive() and not self._check_stop():
 			try:
 				batch = self._outbuffer.get(True, timeout=1)
@@ -76,14 +85,13 @@ class Operation(Source):
 			except Exception as e:
 				pass
 
-		if self._check_stop():
-			self._flush_output()
+		self._flush_output(finish=True)
 
 		while not self._outbuffer.empty() and not self._check_stop():
 			try:
 				batch = self._outbuffer.get(True, timeout=1)
 				for value in batch:
-					yield value 
+					yield value
 			except Exception as e:
 				pass
 
@@ -91,22 +99,45 @@ class Operation(Source):
 		self.finished.set()
 		self.running.clear()
 
-		#if self.exception != None:
-		#	[process.stop() for process in self.processes]
-		#	raise self.exception
-
 	def _output(self, value):
-		self._outbatch.append(value)
+		self._outputs([value])
+
+	def _outputs(self, values):
+		self._outbatch.put(values)
 		if time.time() - self._last_output > 0.5:
 			self._flush_output()
 
-	def _flush_output(self):
+	def _flush_output(self, finish = False):
 		while self._outbuffer.full():
 			if self._check_stop():
 				return
 			time.sleep(1)
-		self._outbuffer.put(self._outbatch)
-		self._outbatch = []
+
+		outbatch = []
+
+		finished = False
+		batch_element = None
+		while not finished and not self._outbatch.empty():
+			batch_element = self._outbatch.get()
+			if not isinstance(batch_element, OutputEndMarker):
+				outbatch.extend(batch_element)
+			else:
+				outbatch.append(batch_element)
+				finished = True
+
+		if finish: #wait for end marker
+			while not finished and not self._check_stop():
+				try:
+					batch_element = self._outbatch.get(timeout=1)
+					if not isinstance(batch_element, OutputEndMarker):
+						outbatch.extend(batch_element)
+					else:
+						outbatch.append(batch_element)
+						finished = True
+				except queue.Empty:
+					pass
+
+		self._outbuffer.put(outbatch)
 		self._last_output = time.time()
 
 	def _check_stop(self):

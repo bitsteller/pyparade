@@ -6,7 +6,7 @@ from future import standard_library
 standard_library.install_aliases()
 from builtins import str
 from builtins import object
-import queue, threading, time, sys, datetime, multiprocessing, signal, threading, sys
+import queue, threading, time, sys, datetime, multiprocessing, signal, threading, sys, itertools
 
 from . import operations
 
@@ -71,7 +71,7 @@ class Dataset(operations.Source):
 		if isinstance(self.source, operations.Operation):
 			values = self.source()
 		else:
-			values = self.source
+			values = itertools.chain((value for value in self.source), [operations.OutputEndMarker()])
 
 		if self._length_is_estimated:
 			self._length = 0
@@ -94,7 +94,8 @@ class Dataset(operations.Source):
 			batch.append(value)
 
 			if self._length_is_estimated:
-				self._length += 1
+				if not isinstance(value, operations.OutputEndMarker):
+					self._length += 1
 
 			if time.time() - last_insert > 0.5:
 				[buf.put(batch) for buf in self._buffers]
@@ -480,31 +481,36 @@ class Buffer(object):
 			values: An iterable containing the elements to but into the buffer. Must support calling len(values)."""
 
 		self.queue.put(values, True)
-		with self._length_lock:
-			self._length += len(values)
+
+		if not isinstance(values, operations.OutputEndMarker):
+			with self._length_lock:
+				self._length += len(values)
 
 	def generate(self):
 		"""A generator yielding elements from the buffer. Runs until the underlying `pyparade.operations.Source` is finished."""
 
-		while not(self.queue.empty() and self.source.finished.is_set()) or self.source._stop_requested.is_set():
+		finished = False
+
+		while not finished or self.source._stop_requested.is_set():
 			try:
 				values = self.queue.get(True, timeout=1)
 				for value in values:
-					yield value
-					with self._length_lock:
-						self._length -= 1
+					if not isinstance(value, operations.OutputEndMarker):
+						with self._length_lock:
+							self._length -= 1
+						yield value
+					else:
+						finished = True
 			except Exception as e:
 				pass
 
-
 		chain = [self.source] + self.source.get_parents()
 		chain.reverse()
-
-		for s in chain:
-			s.stop()
 		
 		for s in chain:
 			if s.exception:
+				for sc in chain: #stop all operations
+					sc.stop()
 				ex_type, ex_value, tb_str = s.exception
 				message = '%s (in %s)' % (str(ex_value), s.name)
 				raise ex_type(message)
