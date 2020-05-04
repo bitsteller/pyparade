@@ -1,4 +1,4 @@
-0.4.2 (unreleased)
+0.4.2 (2020-05-04)
 ------------------
 
 - Improved: Exceptions now keep original traceback details
