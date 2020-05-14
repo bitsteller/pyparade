@@ -485,9 +485,13 @@ class Buffer(object):
 
 		self.queue.put(values, True)
 
-		if not isinstance(values, operations.OutputEndMarker):
+		if not (len(values) > 0 and isinstance(values[-1], operations.OutputEndMarker)):
 			with self._length_lock:
 				self._length += len(values)
+		else:
+			print("test")
+			with self._length_lock:
+				self._length += len(values)-1
 
 	def generate(self):
 		"""A generator yielding elements from the buffer. Runs until the underlying `pyparade.operations.Source` is finished."""
