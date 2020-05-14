@@ -4,20 +4,20 @@ PyParade is a lightweight multiprocessing framework for Python that makes it eas
 
 	pip install pyparade
 
-## Automatic parellization
+## Automatic parallelizing
 
-Similar to [SPARK](https://spark.apache.org) you define how your data should be procesed on a high level and pyParade does the paralellization automatically for you. With pyParade, you don't need to explicitly delegate the work to multiple threads/processes, but you still benefit from the full CPU power available on your machine.
+Similar to [SPARK](https://spark.apache.org) you define how your data should be processed on a high level and pyParade does the parallelizing automatically for you. With pyParade, you don't need to explicitly delegate the work to multiple threads/processes, but you still benefit from the full CPU power available on your machine.
 
 ## Create your processing chain
 
-You model how the result is calculated by applying an operation to a dataset. The result is a new dataset that you can apply new opertions on:
+You model how the result is calculated by applying an operation to a dataset. The result is a new dataset that you can apply new operations on:
 
 	dataset = pyprade.Dataset(range(0,1000))
 	result = dataset.map(f).group_by_key().map(g).collect()
 	
 ## Watch the progress
 
-By default pyParade will display detailled status infomation about the running process on console. It will tell you how much data is already processed and will calculate estimated completion times.
+By default pyParade will display detailed status information about the running process on console. It will tell you how much data is already processed and will calculate estimated completion times.
 
 	Parallel Process
 	================================================================================
