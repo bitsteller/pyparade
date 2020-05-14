@@ -1,4 +1,4 @@
-0.4.3 (unreleased)
+0.4.3 (2020-05-14)
 ------------------
 
 - Fixed: Calculation of buffer size which could lead to a dataset not completing
