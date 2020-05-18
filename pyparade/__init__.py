@@ -489,7 +489,6 @@ class Buffer(object):
 			with self._length_lock:
 				self._length += len(values)
 		else:
-			print("test")
 			with self._length_lock:
 				self._length += len(values)-1
 

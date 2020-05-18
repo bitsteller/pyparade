@@ -1,7 +1,7 @@
 0.4.4 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- Fixed: Debug output on buffer end removed
 
 
 0.4.3 (2020-05-14)
