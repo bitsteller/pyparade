@@ -1,7 +1,8 @@
 0.4.5 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- Improved: Show status 'Finishing' when operation has finished processing and is writing output
+- Fixed: Minor fix when finishing operation
 
 
 0.4.4 (2020-06-23)
