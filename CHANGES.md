@@ -1,6 +1,8 @@
 0.4.4 (unreleased)
 ------------------
 
+- Fixed: Infinite wait at end of operation due to operation stopped before output has ended 
+- Fixed: Operation not finishing due to batch size bigger than buffer size
 - Fixed: Debug output on buffer end removed
 
 
