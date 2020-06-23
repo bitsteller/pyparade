@@ -422,6 +422,8 @@ class ParallelProcess(object):
 				if not op.source.length_is_estimated() and len(op.source) > 0 and op.processed > 0:
 					if op.finished.is_set():
 						status += "done"
+					elif op.output_finished.is_set():
+						status += "finishing"
 					elif op.running.is_set():
 						est = datetime.datetime.now() + datetime.timedelta(seconds = (time.time()-op.time_started)/op.processed*(len(op.source)-op.processed))
 						status += '{0:%}'.format(float(op.processed)/len(op.source)) + "  ETA " + est.strftime("%Y-%m-%d %H:%M") + " "
