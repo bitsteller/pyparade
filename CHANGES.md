@@ -1,4 +1,4 @@
-0.4.4 (unreleased)
+0.4.4 (2020-06-23)
 ------------------
 
 - Fixed: Infinite wait at end of operation due to operation stopped before output has ended 
