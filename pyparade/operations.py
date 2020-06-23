@@ -140,8 +140,9 @@ class Operation(Source):
 				except queue.Empty:
 					pass
 
-		self._outbuffer.put(outbatch)
-		self._last_output = time.time()
+		if len(outbatch) > 0:
+			self._outbuffer.put(outbatch)
+			self._last_output = time.time()
 
 	def _check_stop(self):
 		if self._stop_requested.is_set():
