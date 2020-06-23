@@ -79,8 +79,8 @@ class TestPyParade(unittest.TestCase):
 
 	def test_map(self):
 		def slow_generator():
-			for i in range(1,100):
-				time.sleep(0.1)
+			for i in range(0,15):
+				time.sleep(1 + 5*random.random())
 				yield i
 		
 		def f(a):
@@ -88,9 +88,9 @@ class TestPyParade(unittest.TestCase):
 			time.sleep(0.0001)
 			return a + 1
 
-		d = pyparade.Dataset(slow_generator(), length=100, name="Slowly generated dataset")
-		inc = d.map(f, name="add 1", output_name="Numbers+1").collect()
-		equal = [i+1 for i in range(1,100)]
+		d = pyparade.Dataset(slow_generator(), length=15, name="Slowly generated dataset")
+		inc = d.map(f, name="add 1", output_name="Numbers+1").collect(num_workers=4)
+		equal = [i+1 for i in range(0,15)]
 		self.assertEqual(sum(equal), sum(inc))
 
 	def test_batch(self):
