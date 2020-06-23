@@ -420,7 +420,7 @@ class ParallelProcess(object):
 		else:
 			if op.source.has_length():
 				if not op.source.length_is_estimated() and len(op.source) > 0 and op.processed > 0:
-					if op.processed == len(op.source):
+					if op.finished.is_set():
 						status += "done"
 					elif op.running.is_set():
 						est = datetime.datetime.now() + datetime.timedelta(seconds = (time.time()-op.time_started)/op.processed*(len(op.source)-op.processed))
