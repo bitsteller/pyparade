@@ -58,6 +58,7 @@ class Operation(Source):
 		self.time_finished = None
 		self.num_workers = num_workers
 		self.context = context
+		self.output_finished = threading.Event()
 
 	def __call__(self):
 		self.running.set()
@@ -118,25 +119,24 @@ class Operation(Source):
 
 		outbatch = []
 
-		finished = False
 		batch_element = None
-		while not finished and not self._outbatch.empty():
+		while not self.output_finished.is_set() and not self._outbatch.empty():
 			batch_element = self._outbatch.get()
 			if not isinstance(batch_element, OutputEndMarker):
 				outbatch.extend(batch_element)
 			else:
 				outbatch.append(batch_element)
-				finished = True
+				self.output_finished.set()
 
 		if finish: #wait for end marker
-			while not finished and not self._check_stop():
+			while not self.output_finished.is_set() and not self._check_stop():
 				try:
 					batch_element = self._outbatch.get(timeout=1)
 					if not isinstance(batch_element, OutputEndMarker):
 						outbatch.extend(batch_element)
 					else:
 						outbatch.append(batch_element)
-						finished = True
+						self.output_finished.set()
 				except queue.Empty:
 					pass
 
