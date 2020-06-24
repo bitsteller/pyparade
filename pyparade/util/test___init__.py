@@ -57,7 +57,7 @@ class TestParMap(unittest.TestCase):
 
 	def test_plus_one(self):
 		def f(a):
-			time.sleep(0.1)
+			time.sleep(0.0001)
 
 			return ((a + 1) % 100000, a+1)
 
