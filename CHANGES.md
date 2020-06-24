@@ -1,4 +1,4 @@
-0.4.7 (unreleased)
+0.4.7 (2020-06-24)
 ------------------
 
 - Improved: Improved debugging output on end of operation
