@@ -105,11 +105,11 @@ class TestPyParade(unittest.TestCase):
 	def test_batch(self):
 		d = pyparade.Dataset(list(range(0,1000)), name="Numbers")
 
-		batches = d.batch(10).collect()
+		batches = d.batch(10).collect(name="Batch")
+		print(batches)
 		self.assertEqual(len(batches), 100)
 		self.assertEqual(batches[0][0], 0)
 		self.assertEqual(batches[99][9], 999)
-		print("Test")
 		
 	def test_error(self):
 		def throw_error(value):
