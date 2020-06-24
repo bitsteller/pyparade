@@ -1,7 +1,9 @@
 0.4.7 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- Improved: Improved debugging output on end of operation
+- Improved: Adjusted some test cases
+- Fixed: Potential deadlock at end of operation
 
 
 0.4.6 (2020-06-24)

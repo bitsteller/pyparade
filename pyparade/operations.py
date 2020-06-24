@@ -123,7 +123,8 @@ class Operation(Source):
 
 	def _flush_output(self, finish = False):
 		while self._outbuffer.full():
-			print(self.name + " is waiting for space in outbuffer")
+			if pyparade.util.DEBUG:
+				print(self.name + " is waiting for space in outbuffer")
 			if self._check_stop():
 				return
 			time.sleep(1)
