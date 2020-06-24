@@ -86,19 +86,21 @@ class Operation(Source):
 				batch = self._outbuffer.get(True, timeout=1)
 				for value in batch:
 					yield value
-			except Exception as e:
+			except queue.Empty:
 				pass
 
 		if pyparade.util.DEBUG:
 			print(self.name + " is flushing output to finish")
 		self._flush_output(finish=True)
 
+		if pyparade.util.DEBUG:
+			print(self.name + " is finishing output")
 		while not self._outbuffer.empty() and not self._check_stop():
 			try:
 				batch = self._outbuffer.get(True, timeout=1)
 				for value in batch:
 					yield value
-			except Exception as e:
+			except queue.Empty:
 				pass
 
 		if self._check_stop() and hasattr(self, "pool"):
@@ -121,34 +123,27 @@ class Operation(Source):
 
 	def _flush_output(self, finish = False):
 		while self._outbuffer.full():
+			print(self.name + " is waiting for space in outbuffer")
 			if self._check_stop():
 				return
 			time.sleep(1)
 
 		outbatch = []
 
-		batch_element = None
-		while not self.output_finished.is_set() and not self._outbatch.empty():
-			batch_element = self._outbatch.get()
-			if not isinstance(batch_element, OutputEndMarker):
-				outbatch.extend(batch_element)
-			else:
-				outbatch.append(batch_element)
-				self.output_finished.set()
-
-		if finish: #wait for end marker
-			if pyparade.util.DEBUG:
-				print(self.name + " is waiting for end marker")
-			while not self.output_finished.is_set() and not self._check_stop():
-				try:
-					batch_element = self._outbatch.get(timeout=1)
-					if not isinstance(batch_element, OutputEndMarker):
-						outbatch.extend(batch_element)
-					else:
-						outbatch.append(batch_element)
-						self.output_finished.set()
-				except queue.Empty:
-					pass
+		while not self.output_finished.is_set() and not self._check_stop():
+			try:
+				batch_element = self._outbatch.get(timeout=1)
+				if not isinstance(batch_element, OutputEndMarker):
+					outbatch.extend(batch_element)
+				else:
+					outbatch.append(batch_element)
+					self.output_finished.set()
+			except queue.Empty:
+				if finish:
+					if pyparade.util.DEBUG:
+						print(self.name + " is waiting for end marker")
+				else: #all elements added to outbatch for now
+					break
 
 		if len(outbatch) > 0:
 			self._outbuffer.put(outbatch)
