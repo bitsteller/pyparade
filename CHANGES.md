@@ -1,7 +1,7 @@
 0.4.6 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- New: Optional debug mode for verbose output
 
 
 0.4.5 (2020-06-23)
