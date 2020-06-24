@@ -5,6 +5,9 @@ import time, random
 
 
 import pyparade
+import pyparade.util
+
+pyparade.util.DEBUG = True
 
 class TestPyParade(unittest.TestCase):
 	"""Uses a comination of map and reduceByKey to calculate occurencies of each word in a text.
@@ -62,20 +65,26 @@ class TestPyParade(unittest.TestCase):
 		def f(a):
 			#print(str(a) + "->" + str(a+1))
 			#time.sleep(0.001)
-			for i in range(0,1000):
+			for i in range(0,1):
 				random.random()
+				time.sleep(0.01)
+
 
 			return ((a + 1) % 100000, a+1)
 
 		def g(kv):
+			for i in range(0,5):
+				random.random()
+				time.sleep(0.01)
+
 			k,v = kv
 			return v
 
-		result = pyparade.Dataset(list(range(0,100000)), name="Numbers") \
+		result = pyparade.Dataset(list(range(0,10000)), name="Numbers") \
 					.map(f, name="calculate", output_name="Key/Value pairs") \
 				 	.map(g, name="take value", output_name="Values") \
-				 	.fold(0,operator.add,name="sum", output_name="Sum").collect()
-		self.assertEqual(result[0], sum(range(1,100001)))
+				 	.fold(0,operator.add,name="sum", output_name="Sum").collect(num_workers=4)
+		self.assertEqual(result[0], sum(range(1,10001)))
 
 	def test_map(self):
 		def slow_generator():

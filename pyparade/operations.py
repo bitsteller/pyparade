@@ -5,6 +5,7 @@ from builtins import zip
 from builtins import object
 import threading, multiprocessing, queue, time, collections, sys, traceback
 
+import pyparade.util
 from pyparade.util import ParMap
 from pyparade.util.btree import BTree
 
@@ -73,6 +74,8 @@ class Operation(Source):
 				self.exception = error
 			finally:
 				self._outputs(OutputEndMarker())
+				if pyparade.util.DEBUG:
+					print(self.name + " has finished processing")
 
 
 		self._thread = threading.Thread(target=_run, name=str(self))
@@ -86,6 +89,8 @@ class Operation(Source):
 			except Exception as e:
 				pass
 
+		if pyparade.util.DEBUG:
+			print(self.name + " is flushing output to finish")
 		self._flush_output(finish=True)
 
 		while not self._outbuffer.empty() and not self._check_stop():
@@ -102,6 +107,9 @@ class Operation(Source):
 		self.time_finished = time.time()
 		self.finished.set()
 		self.running.clear()
+
+		if pyparade.util.DEBUG:
+			print(self.name + " is done")
 
 	def _output(self, value):
 		self._outputs([value])
@@ -129,6 +137,8 @@ class Operation(Source):
 				self.output_finished.set()
 
 		if finish: #wait for end marker
+			if pyparade.util.DEBUG:
+				print(self.name + " is waiting for end marker")
 			while not self.output_finished.is_set() and not self._check_stop():
 				try:
 					batch_element = self._outbatch.get(timeout=1)
@@ -143,6 +153,7 @@ class Operation(Source):
 		if len(outbatch) > 0:
 			self._outbuffer.put(outbatch)
 			self._last_output = time.time()
+
 
 	def _check_stop(self):
 		if self._stop_requested.is_set():

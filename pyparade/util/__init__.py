@@ -11,6 +11,8 @@ from multiprocessing import Process
 import multiprocessing
 import sys
 
+DEBUG = False
+
 def sstr(obj):
 	""" converts any object to str, if necessary encodes unicode chars """
 	try:
