@@ -81,6 +81,7 @@ class Operation(Source):
 		self._thread = threading.Thread(target=_run, name=str(self))
 		self._thread.start()
 
+		#while processing, yield output batches
 		while self._thread.is_alive() and not self._check_stop():
 			try:
 				batch = self._outbuffer.get(True, timeout=1)
@@ -89,10 +90,26 @@ class Operation(Source):
 			except queue.Empty:
 				pass
 
+		#Make sure that there is space for OutputEndMarker
+		if pyparade.util.DEBUG:
+			print(self.name + " is clearing output to finish")
+
+		while not self._outbuffer.empty() and not self._check_stop():
+			try:
+				batch = self._outbuffer.get(True, timeout=1)
+				for value in batch:
+					yield value
+			except queue.Empty:
+				pass
+
+		#Add leftover output batch and OutputEndMarker to buffer
 		if pyparade.util.DEBUG:
 			print(self.name + " is flushing output to finish")
-		self._flush_output(finish=True)
 
+		if not self._check_stop():
+			self._flush_output(finish=True)
+
+		#Yield remaining output buffer
 		if pyparade.util.DEBUG:
 			print(self.name + " is finishing output")
 		while not self._outbuffer.empty() and not self._check_stop():
@@ -122,12 +139,8 @@ class Operation(Source):
 			self._flush_output()
 
 	def _flush_output(self, finish = False):
-		while self._outbuffer.full():
-			if pyparade.util.DEBUG:
-				print(self.name + " is waiting for space in outbuffer")
-			if self._check_stop():
-				return
-			time.sleep(1)
+		if self._outbuffer.full():
+			raise queue.Full("No space in outbuffer to flush output")
 
 		outbatch = []
 

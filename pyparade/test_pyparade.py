@@ -7,7 +7,7 @@ import time, random
 import pyparade
 import pyparade.util
 
-pyparade.util.DEBUG = True
+#pyparade.util.DEBUG = True
 
 class TestPyParade(unittest.TestCase):
 	"""Uses a comination of map and reduceByKey to calculate occurencies of each word in a text.
@@ -106,7 +106,7 @@ class TestPyParade(unittest.TestCase):
 		d = pyparade.Dataset(list(range(0,1000)), name="Numbers")
 
 		batches = d.batch(10).collect(name="Batch")
-		print(batches)
+		#print(batches)
 		self.assertEqual(len(batches), 100)
 		self.assertEqual(batches[0][0], 0)
 		self.assertEqual(batches[99][9], 999)

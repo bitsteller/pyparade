@@ -1,7 +1,7 @@
 0.4.8 (unreleased)
 ------------------
 
-- Nothing changed yet.
+- Fixed: Operation could get stuck when finished processing and output buffer full
 
 
 0.4.7 (2020-06-24)
